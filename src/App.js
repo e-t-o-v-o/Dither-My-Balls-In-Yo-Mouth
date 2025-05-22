@@ -7,7 +7,7 @@ import C2S from 'canvas2svg';
 
 // Load saved config and define initial settings
 const defaultConfig = {
-  mode: 'video', effect: 'channel', fgColor: '#FFFFFF', bgColor: '#000000', threshold: 128,
+  mode: 'video', effect: 'palette', fgColor: '#FFFFFF', bgColor: '#000000', threshold: 128,
   pixelSize: 20, font: 'Arial', recordingFormat: 'mp4', decadePalette: 'Default', charPalette: 'Default',
   ditherPalette: 'Default',
   smoothFactor: 1,  // 0=static frame, 1=full real-time
