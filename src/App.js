@@ -868,7 +868,13 @@ function App() {
       <main className="App-main">
         <section className="preview">
           <canvas ref={canvasRef} className="preview-canvas" />
-          <video ref={videoRef} style={{ display:'none' }} />
+          <video
+            ref={videoRef}
+            style={{ display: 'none' }}
+            muted
+            playsInline
+            autoPlay
+          />
         </section>
         <ControlsPanel
           config={config}
