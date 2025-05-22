@@ -39,12 +39,17 @@ html, body {
 }
 
 .App {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   overflow: hidden;
 }
 
 .App-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(8px);
   background: var(--header-bg);
   padding: 1rem 2rem;
   display: flex;
@@ -68,15 +73,18 @@ html, body {
 }
 
 .App-main {
-  display: grid;
-  grid-template-columns: 2fr minmax(250px, 300px);
-  height: 100%;
+  display: flex;
+  flex: 1;
   overflow: hidden;
   min-height: 0;
 }
 
 .preview {
-  overflow: hidden;
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-color);
 }
 
 .preview-canvas {
@@ -87,34 +95,26 @@ html, body {
 }
 
 .controls {
-  flex: 0 0 300px;
-  min-width: 250px;
+  flex: 1;
   max-width: 300px;
-  display: flex;
-  flex-direction: column;
+  min-width: 250px;
   overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
   padding: 2rem;
   background: var(--controls-bg);
   box-shadow: -2px 0 4px rgba(0,0,0,0.5);
   min-height: 0;
   gap: 1.5rem;
+  scroll-behavior: smooth;
 }
 
-.controls label {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
+.controls label,
+.controls details {
+  margin-bottom: 1.5rem;
 }
 
-select,
-input[type="range"],
-input[type="number"],
-input[type="text"],
-input[type="file"] {
+.controls select,
+.controls input,
+.controls button {
   width: 100%;
   padding: 0.5rem;
   background: var(--input-bg);
@@ -266,6 +266,55 @@ details[open] > *:not(summary) {
   max-height: 1000px;
 }
 
+/* Group controls into collapsible sections */
+.controls details {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+.controls details summary {
+  padding: 0.75rem 1rem;
+  background: var(--input-bg);
+  cursor: pointer;
+  font-weight: 600;
+}
+.controls details[open] summary {
+  border-bottom: 1px solid var(--border-color);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.controls details > *:not(summary) {
+  padding: 1rem;
+}
+
+/* Details section toggle icons */
+.controls details summary {
+  list-style: none;
+  position: relative;
+}
+.controls details summary::-webkit-details-marker {
+  display: none;
+}
+.controls details summary:before {
+  content: '►';
+  position: relative;
+  margin-right: 0.5rem;
+  transition: transform 0.2s ease;
+}
+.controls details[open] summary:before {
+  transform: rotate(90deg);
+}
+/* Spacing for inner details content */
+.controls details > *:not(summary) label,
+.controls details > *:not(summary) select,
+.controls details > *:not(summary) input,
+.controls details > *:not(summary) button {
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
 /* ===== Preset & Settings Dropdown Fix ===== */
 .controls details {
   width: 100% !important;
@@ -282,24 +331,24 @@ details[open] > *:not(summary) {
   overflow: visible !important;
 }
 
-@media only screen and (max-width: 768px) {
+/* Mobile-responsive layout */
+@media (max-width: 768px) {
   .App-main {
-    display: flex;
     flex-direction: column;
   }
-  .preview {
-    flex: none;
-    height: 60vh;
-    overflow: hidden;
-  }
   .controls {
-    flex: 1;
-    overflow-y: auto;
+    max-width: none;
+    border-top: 1px solid var(--border-color);
+    box-shadow: none;
+    padding: 1rem;
+  }
+  .preview {
+    height: 50vh;
+    min-height: auto;
+  }
+  .preview-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 }
-
-/* ===== Layout & Sidebar Scroll Fix ===== */
-html, body, #root { height: 100%; margin: 0; }
-.App { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-.App-main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-.preview { flex: 2; min-width: 0; min-height: 0; overflow: hidden; }
