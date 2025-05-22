@@ -1,0 +1,867 @@
+import React, { useRef, useEffect, useState } from 'react';
+import './App.css';
+import GIF from 'gif.js/dist/gif.js';
+import quantize from 'quantize';
+
+const presetColors = [
+  { label: 'White', value: '#FFFFFF' },
+  { label: 'Black', value: '#000000' },
+  { label: 'Blurple', value: '#3300FF' },
+  { label: 'Neon Greene', value: '#32FF00' },
+  { label: 'GrÆ', value: '#D5D5D5' },
+];
+
+const effects = [
+  'two-tone',
+  'binary',
+  'decade',
+  'channel',
+  'ascii',
+  'dither',
+  'dither-ascii',
+  'binary-char',
+  'brightness-map',
+  'color-map',
+  'numbers-0-9-img',
+  'numbers-0-9-palette',
+  'letters-palette',
+  'letter-char',
+  'circle-palette',
+];
+
+const fonts = [
+  'monospace',
+  'Courier New',
+  'Arial',
+  'Verdana',
+  'Tahoma',
+  'Georgia',
+  'Times New Roman',
+  'Comic Sans MS',
+  'Impact',
+];
+
+const palette10 = [
+  '#000000',
+  '#FFFFFF',
+  '#D5D5D5',
+  '#32FF00',
+  '#3300FF',
+  '#FF0000',
+  '#00FFFF',
+  '#FFA500',
+  '#FF00FF',
+  '#008080'
+];
+
+const palette5 = ['#32FF00','#3300FF','#D5D5D5','#FFFFFF','#000000'];
+
+const decadePalettes = {
+  Default: palette10,
+  Warm: ['#000000','#FF0000','#FFA500','#FFFF00','#FFFFFF','#800000','#808000','#FFD700','#C71585','#FF69B4'],
+  Cool: ['#000000','#0000FF','#00FFFF','#008080','#3300FF','#00FF00','#000080','#0066CC','#0033FF','#0099FF'],
+  Pastel: ['#FFB3BA','#FFDFBA','#FFFFBA','#BAFFC9','#BAE1FF','#DDBDF1','#FFC8DD','#E2F0CB','#F7DFB1','#D1C6B4'],
+  Vintage: ['#704214','#A97455','#D3B583','#E3C9A7','#B28D57','#866D4B','#C4A69F','#795548','#6D4C41','#8D6E63'],
+};
+
+const charPalettes = {
+  Default: palette10,
+  'Extracted': [],
+  'Pure BW': ['#000000', '#FFFFFF'],
+  'Channel Colors': palette5,
+  Warm: decadePalettes.Warm,
+  Cool: decadePalettes.Cool,
+  Pastel: decadePalettes.Pastel,
+  Vintage: decadePalettes.Vintage,
+  'Black & White': ['#000000','#1C1C1C','#383838','#545454','#707070','#8C8C8C','#A8A8A8','#C4C4C4','#E0E0E0','#FFFFFF'],
+  'Solarized Light': ['#FDF6E3','#EEE8D5','#93A1A1','#839496','#657B83','#073642','#002B36','#DC322F','#CB4B16'],
+  'Solarized Dark': ['#002B36','#073642','#586E75','#657B83','#839496','#93A1A1','#EEE8D5','#FDF6E3','#DC322F','#CB4B16'],
+  'Rainbow': ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#4B0082','#9400D3','#FF1493','#00CED1','#FFD700'],
+  'Pastel Extended': ['#FFF0F5','#E6E6FA','#F0FFF0','#FFFACD','#E0FFFF','#F5FFFA','#F0F8FF','#FAF0E6','#FFE4E1','#FFFFF0'],
+};
+
+const palette5Sets = {
+  'Channel Colors': ['#000000','#3300FF','#D5D5D5','#FFFFFF','#32FF00'],
+  'Solarized 5 Light': ['#FDF6E3','#EEE8D5','#93A1A1','#839496','#657B83'],
+  'Solarized 5 Dark': ['#002B36','#073642','#586E75','#657B83','#839496'],
+  'Rainbow 5': ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF'],
+  'Pastel 5': ['#FFB3BA','#FFDFBA','#FFFFBA','#BAFFC9','#BAE1FF'],
+  'Black & White': ['#000000','#404040','#808080','#BFBFBF','#FFFFFF'],
+};
+
+const asciiVariants = {
+  Default: ['@','#','8','&','o',':','.',' '],
+  'Block Shades': ['░','▒','▓','█'],
+  Braille: ['⠁','⠃','⠇','⠧','⠷','⠿'],
+  Dots: ['.','·','•','‧'],
+  'Box Drawing': ['─','│','┌','┐','└','┘','├','┤','┬','┴','┼'],
+  Quadrants: ['▘','▝','▖','▗','▚','▛','▜','▟'],
+  Chess: ['♔','♕','♖','♗','♘','♙','♚','♛','♜','♝','♞','♟'],
+  Shapes: ['■','□','▲','▼','◆','◇','○','●','◯','◉','◎','◈'],
+  Math: ['+','-','×','÷','=','~','≈','±','∞','√','∑','∏'],
+  Emojis: ['😊','😂','😍','😎','🤖','👍','🌟','🎵','🔥','✨'],
+  'Squares & lines': ['▢','▣','▤','▥','▦','▧','▨','▩','░','▒','▓','█','▀','▄','▌','▐','▘','▝','▖','▗','▚','▞','▛','▜','▟','┌','┬','┐','─','┼','─','╔','╦','╗','═','╩','╝','╚','╩','═','/','\\','|','+','•'],
+  Arrows: ['↑','↓','←','→','↔','↖','↗','↘','↙','⇠','⇢','⇳','⇶','⟴','⤱','•'],
+  Marathon: ['·','□','○','×','△','◦','◉','◎']
+};
+
+// Load saved config and define initial settings
+const defaultConfig = {
+  mode: 'video', effect: 'channel', fgColor: '#FFFFFF', bgColor: '#000000', threshold: 128,
+  pixelSize: 20, font: 'Arial', recordingFormat: 'webm', decadePalette: 'Default', charPalette: 'Default',
+  char: '.', fontSize: 20,
+  letterCount: 10, outputResolution: 'native', palette5Name: 'Channel Colors', ditherMethod: 'ordered', extractCount: 8,
+  asciiVariant: 'Default',
+  transparentBg: false,
+};
+
+const savedConfig = JSON.parse(localStorage.getItem('config') || 'null');
+const initialConfig = savedConfig ? { ...defaultConfig, ...savedConfig } : defaultConfig;
+
+function App() {
+  const [config, setConfig] = useState(initialConfig);
+  const [fontsList, setFontsList] = useState(fonts);
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [recorder, setRecorder] = useState(null);
+  const [gifRecorder, setGifRecorder] = useState(null);
+  const imageRef = useRef(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [videoFileLoaded, setVideoFileLoaded] = useState(false);
+  const ditherWorkerRef = useRef(null);
+  const latestBitmapRef = useRef(null);
+  const pendingRef = useRef(false);
+  // offscreen canvases for processing
+  const offscreenRef = useRef(document.createElement('canvas'));
+  const offCtxRef = useRef(offscreenRef.current.getContext('2d'));
+  const off2screenRef = useRef(document.createElement('canvas'));
+  const off2CtxRef = useRef(off2screenRef.current.getContext('2d'));
+  // caching for dynamic palette extraction
+  const extractCacheRef = useRef({ count: initialConfig.extractCount, palette: [] });
+  const frameCountRef = useRef(0);
+
+  const configRef = useRef(config);
+  useEffect(() => { configRef.current = config; }, [config]);
+  useEffect(() => { localStorage.setItem('config', JSON.stringify(config)); }, [config]);
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
+  useEffect(() => { localStorage.setItem('theme', theme); }, [theme]);
+  useEffect(() => {
+    console.log('[App] Initializing dither worker');
+    ditherWorkerRef.current = new Worker('/ditherWorker.js');
+    ditherWorkerRef.current.onerror = e => console.error('Dither worker error', e.message, e);
+    ditherWorkerRef.current.onmessage = (e) => {
+      console.log('[App] Worker done', e.data);
+      const bmp = e.data.bitmap;
+      latestBitmapRef.current = bmp;
+      pendingRef.current = false;
+      const cfg2 = configRef.current;
+      // if ascii mode, overlay letters onto dithered frame
+      if (cfg2.effect === 'dither-ascii') {
+        const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+        const size = cfg2.pixelSize;
+        const w = Math.floor(canvas.width / size);
+        const h = Math.floor(canvas.height / size);
+        const off2 = off2screenRef.current; off2.width = w; off2.height = h;
+        const offCtx2 = off2CtxRef.current; offCtx2.drawImage(bmp, 0, 0, w, h);
+        const data = offCtx2.getImageData(0, 0, w, h).data;
+        ctx.font = `${cfg2.fontSize}px ${cfg2.font}`;
+        ctx.textAlign = 'start'; ctx.textBaseline = 'top';
+        const variant = asciiVariants[cfg2.asciiVariant] || asciiVariants.Default;
+        const pal2 = cfg2.charPalette === 'Extracted'
+          ? quantize(Array.from({ length: data.length/4 }, (_, i) => [data[i*4], data[i*4+1], data[i*4+2]]), cfg2.extractCount)
+              .palette().map(rgb => '#' + rgb.map(v=>v.toString(16).padStart(2,'0')).join(''))
+          : (charPalettes[cfg2.charPalette] || palette10);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            if (data[i+3] === 0) continue;  // skip transparent
+            const brightness = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+            const idx2 = Math.floor((brightness/255)*(variant.length-1));
+            const ch2 = variant[idx2];
+            ctx.font = `${cfg2.fontSize}px ${cfg2.font}`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = pal2[idx2] || cfg2.fgColor;
+            ctx.fillText(ch2, x*size + size/2, y*size + size/2);
+          }
+        }
+      }
+    };
+    return () => ditherWorkerRef.current.terminate();
+  }, []);
+
+  // handle video file uploads
+  const handleVideoUpload = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const url = URL.createObjectURL(file);
+    const vid = videoRef.current;
+    if (vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; }
+    vid.src = url;
+    setConfig(prev => ({ ...prev, mode: 'video-file' }));
+    vid.onloadeddata = async () => {
+      await vid.play();
+      setVideoFileLoaded(true);
+    };
+  };
+
+  // Schedule rendering and media streams based on mode and load states
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let rafId;
+    let camStream;
+    let lastTime = 0;
+    const loop = async (time) => {
+      const cfg = configRef.current;
+      // initialize webcam stream
+      if (cfg.mode === 'video' && !camStream) {
+        try {
+          camStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+          videoRef.current.srcObject = camStream;
+          await videoRef.current.play();
+        } catch (err) {
+          console.error('Webcam error', err);
+          return;
+        }
+      }
+      // throttle FPS: 4k -> 30fps, else 60fps
+      const targetFps = (configRef.current.outputResolution === '4k') ? 30 : 60;
+      const interval = 1000 / targetFps;
+      if (time - lastTime >= interval) {
+        draw();
+        lastTime = time;
+      }
+      rafId = requestAnimationFrame(loop);
+    };
+    rafId = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (camStream) camStream.getTracks().forEach(t => t.stop());
+    };
+  }, [config.mode, videoFileLoaded, imageLoaded]);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const parsed = ['threshold','pixelSize','fontSize','letterCount','extractCount'].includes(name)
+      ? parseInt(value)
+      : value;
+    const finalVal = type === 'checkbox' ? checked : parsed;
+    setConfig(prev => ({ ...prev, [name]: finalVal }));
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      setConfig(prev => ({ ...prev, mode: 'image' }));
+      imageRef.current = img;
+      setImageLoaded(true);
+    };
+    img.src = url;
+  };
+
+  const handleFontUpload = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const name = file.name.replace(/\.[^.]+$/, '');
+    const fontFace = new FontFace(name, `url(${url})`);
+    fontFace.load().then(ff => {
+      document.fonts.add(ff);
+      setFontsList(list => [...list, name]);
+      setConfig(prev => ({ ...prev, font: name }));
+    }).catch(err => console.error('Font load error', err));
+  };
+
+  const downloadImage = () => {
+    const canvas = canvasRef.current;
+    let outCanvas = canvas;
+    if (config.mode === 'image') {
+      const w = canvas.width, h = canvas.height;
+      const data = canvas.getContext('2d').getImageData(0,0,w,h).data;
+      let minX = w, minY = h, maxX = 0, maxY = 0;
+      for (let y=0; y<h; y++) for (let x=0; x<w; x++) {
+        if (data[(y*w+x)*4+3]>0) { minX=Math.min(minX,x); minY=Math.min(minY,y); maxX=Math.max(maxX,x); maxY=Math.max(maxY,y); }
+      }
+      if (maxX>=minX && maxY>=minY) {
+        const tw = maxX-minX+1, th = maxY-minY+1;
+        const temp = document.createElement('canvas'); temp.width=tw; temp.height=th;
+        temp.getContext('2d').drawImage(canvas, minX, minY, tw, th, 0, 0, tw, th);
+        outCanvas = temp;
+      }
+    }
+    const url = outCanvas.toDataURL('image/png');
+    const a = document.createElement('a'); a.href = url; a.download = 'filtered.png'; a.click();
+  };
+
+  const downloadVideo = () => {
+    const canvas = canvasRef.current;
+    const stream = canvas.captureStream(30);
+    const chunks = [];
+    const format = config.recordingFormat;
+    let mimeType = 'video/webm';
+    if (format === 'mp4' && MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
+    const mediaRec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 50000000 });
+    mediaRec.ondataavailable = e => chunks.push(e.data);
+    mediaRec.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `processed.${format==='mp4'?'mp4':'webm'}`;
+      a.click();
+    };
+    mediaRec.start();
+    const vid = videoRef.current;
+    vid.currentTime = 0;
+    vid.onended = () => mediaRec.stop();
+    vid.play();
+  };
+
+  const startRecording = () => {
+    if (config.recordingFormat === 'gif') {
+      if (gifRecorder) {
+        console.warn('GIF recorder already running');
+        return;
+      }
+      const canvas = canvasRef.current;
+      const gif = new GIF({ workers: 2, quality: 10, width: canvas.width, height: canvas.height });
+      gif.on('finished', blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'capture.gif';
+        a.click();
+      });
+      setGifRecorder(gif);
+      return;
+    }
+    const stream = canvasRef.current.captureStream(30);
+    const format = config.recordingFormat;
+    let mimeType = 'video/webm';
+    if (format === 'mp4' && MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
+    const mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 50000000 });
+    const chunks = [];
+    mediaRecorder.ondataavailable = event => chunks.push(event.data);
+    mediaRecorder.onstop = () => { const blob = new Blob(chunks, { type: mimeType }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `capture.${format==='mp4'?'mp4':'webm'}`; a.click(); setRecorder(null); };
+    mediaRecorder.start(); setRecorder(mediaRecorder);
+  };
+
+  const stopRecording = () => {
+    if (gifRecorder) {
+      try {
+        gifRecorder.render();
+      } catch (e) {
+        if (e.message !== 'Already running') console.error(e);
+      }
+      setGifRecorder(null);
+    } else if (recorder) {
+      recorder.stop();
+    }
+  };
+
+  const draw = () => {
+    frameCountRef.current++;
+    const cfg = configRef.current;
+    const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
+    let source;
+    if (cfg.mode === 'image') {
+      if (!imageLoaded) return;
+      source = imageRef.current;
+    } else {
+      // live or file video
+      if (cfg.mode === 'video-file') {
+        if (!videoFileLoaded) return;
+        source = videoRef.current;
+      } else if (cfg.mode === 'video') {
+        // always allow live feed for dithering
+        if (cfg.effect !== 'dither' && (!videoRef.current || videoRef.current.readyState < 2)) return;
+        source = videoRef.current;
+      }
+    }
+    // adjust internal processing resolution
+    let resW, resH;
+    if (cfg.outputResolution === '4k') {
+      // always full 4K processing
+      resW = 3840; resH = 2160;
+    } else if (cfg.outputResolution === '1080p') {
+      resW = 1920; resH = 1080;
+    } else if (cfg.mode === 'image') {
+      resW = source.naturalWidth; resH = source.naturalHeight;
+    } else {
+      resW = source.videoWidth; resH = source.videoHeight;
+    }
+    canvas.width = resW; canvas.height = resH;
+    // maintain correct preview aspect ratio
+    canvas.style.aspectRatio = `${resW}/${resH}`;
+
+    // dither path: process offscreen then draw in onmessage, skip fill and other effects
+    if (cfg.effect === 'dither' || cfg.effect === 'dither-ascii') {
+      // ensure valid dims
+      if (!canvas.width || !canvas.height) return;
+      const size = cfg.pixelSize;
+      const w = Math.floor(canvas.width / size); if (!w) return;
+      const h = Math.floor(canvas.height / size); if (!h) return;
+      // reuse offscreen canvas to avoid allocations
+      const off = offscreenRef.current;
+      if (off.width !== w || off.height !== h) { off.width = w; off.height = h; }
+      const offCtx = offCtxRef.current;
+      offCtx.imageSmoothingEnabled = false;
+      offCtx.drawImage(source, 0, 0, w, h);
+      if (!pendingRef.current) {
+        pendingRef.current = true;
+        let pal;
+        if (cfg.charPalette === 'Extracted') {
+          const cache = extractCacheRef.current;
+          // refresh cache when count changes or every 60 frames
+          if (cfg.extractCount !== cache.count || frameCountRef.current % 60 === 0) {
+            const data = offCtx.getImageData(0, 0, w, h).data;
+            const pxs = [];
+            for (let i = 0; i < data.length; i += 4) {
+              pxs.push([data[i], data[i+1], data[i+2]]);
+            }
+            const cmap = quantize(pxs, cfg.extractCount);
+            cache.palette = cmap.palette().map(rgb => '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join(''));
+            cache.count = cfg.extractCount;
+          }
+          pal = extractCacheRef.current.palette;
+        } else {
+          pal = charPalettes[cfg.charPalette] || palette10;
+        }
+        createImageBitmap(off).then(bitmap =>
+          ditherWorkerRef.current.postMessage({ bitmap, palette: pal, method: cfg.ditherMethod, width: w, height: h }, [bitmap])
+        );
+      }
+      const bmp = latestBitmapRef.current;
+      if (bmp) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+    ctx.imageSmoothingEnabled = false;
+    if (cfg.mode === 'image' || cfg.transparentBg) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.fillStyle = cfg.bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    const size = cfg.pixelSize;
+    // guard zero sizes
+    if (!canvas.width || !canvas.height) return;
+    const w = Math.floor(canvas.width / size);
+    const h = Math.floor(canvas.height / size);
+    if (!w || !h) return;
+    ctx.font = `${cfg.fontSize}px ${cfg.font}`;
+
+    const off = offscreenRef.current;
+    off.width = w;
+    off.height = h;
+    const offCtx = offCtxRef.current;
+    offCtx.imageSmoothingEnabled = false;
+    offCtx.drawImage(source, 0, 0, w, h);
+    let data;
+    try {
+      data = offCtx.getImageData(0, 0, w, h).data;
+    } catch (err) {
+      console.error('offCtx.getImageData error', err);
+      return;
+    }
+
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'start';
+
+    let errorBuffer;
+    if (cfg.effect === 'dither' && cfg.ditherMethod === 'floyd') {
+      errorBuffer = Array.from({ length: h }, () => Array(w).fill(0));
+    }
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const px = x * size;
+        const py = y * size;
+        const i = (y * w + x) * 4;
+        // skip transparent source pixels
+        const alpha = data[i + 3]; if (alpha === 0) continue;
+        const r = data[i], g = data[i+1], b = data[i+2];
+        const brightness = (0.299*r + 0.587*g + 0.114*b);
+
+        switch (cfg.effect) {
+          case 'two-tone':
+            ctx.fillStyle = brightness > cfg.threshold ? cfg.fgColor : cfg.bgColor;
+            ctx.fillRect(px, py, size, size);
+            break;
+          case 'binary':
+            const isOne = brightness > cfg.threshold;
+            const bit = isOne ? '1' : '0';
+            ctx.fillStyle = isOne ? cfg.fgColor : cfg.bgColor;
+            ctx.fillRect(px, py, size, size);
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = isOne ? cfg.bgColor : cfg.fgColor;
+            ctx.fillText(bit, px + size/2, py + size/2);
+            break;
+          case 'decade': {
+            const r0 = r, g0 = g, b0 = b;
+            let minDist = Infinity, idx10 = 0;
+            for (let k = 0; k < decadePalettes[cfg.decadePalette].length; k++) {
+              const col = decadePalettes[cfg.decadePalette][k];
+              const pr = parseInt(col.slice(1,3),16), pg = parseInt(col.slice(3,5),16), pb = parseInt(col.slice(5,7),16);
+              const d = (r0-pr)**2 + (g0-pg)**2 + (b0-pb)**2;
+              if (d < minDist) { minDist = d; idx10 = k; }
+            }
+            const blockCol = decadePalettes[cfg.decadePalette][idx10];
+            ctx.fillStyle = blockCol; ctx.fillRect(px, py, size, size);
+            const pr = parseInt(blockCol.slice(1,3),16), pg = parseInt(blockCol.slice(3,5),16), pb = parseInt(blockCol.slice(5,7),16);
+            const blockB = 0.299*pr + 0.587*pg + 0.114*pb;
+            const txtColor = blockB > 128 ? '#000000' : '#FFFFFF';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = txtColor; ctx.fillText(idx10.toString(), px+size/2, py+size/2);
+            break;
+          }
+          case 'channel': {
+            let minDist = Infinity, idx5 = 0;
+            for (let k = 0; k < palette5.length; k++) {
+              const col = palette5[k];
+              const pr = parseInt(col.slice(1,3),16), pg = parseInt(col.slice(3,5),16), pb = parseInt(col.slice(5,7),16);
+              const d = (r-pr)*(r-pr) + (g-pg)*(g-pg) + (b-pb)*(b-pb);
+              if (d < minDist) { minDist = d; idx5 = k; }
+            }
+            const blockCol = palette5[idx5];
+            ctx.fillStyle = blockCol; ctx.fillRect(px, py, size, size);
+            const bb = 0.299*parseInt(blockCol.slice(1,3),16) + 0.587*parseInt(blockCol.slice(3,5),16) + 0.114*parseInt(blockCol.slice(5,7),16);
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = bb > 128 ? '#000000' : '#FFFFFF';
+            ctx.fillText(idx5.toString(), px + size/2, py + size/2);
+            break;
+          }
+          case 'dither': {
+            const pal = charPalettes[cfg.charPalette] || palette10;
+            const L = pal.length;
+            if (cfg.ditherMethod === 'ordered') {
+              // ordered 4x4 Bayer dithering
+              const mat = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+              const sub = Math.floor(size/4);
+              const levelNorm = (brightness/255)*(L-1);
+              for (let iy = 0; iy < 4; iy++) {
+                for (let ix = 0; ix < 4; ix++) {
+                  const thresh = mat[iy][ix]/16;
+                  const idx = Math.min(L-1, Math.floor(levelNorm + thresh));
+                  ctx.fillStyle = pal[idx] || '#000000';
+                  ctx.fillRect(px + ix*sub, py + iy*sub, sub, sub);
+                }
+              }
+            } else if (cfg.ditherMethod === 'floyd') {
+              // Floyd–Steinberg error diffusion
+              const oldPixel = brightness + errorBuffer[y][x];
+              const norm = oldPixel/255*(L-1);
+              const idx = Math.max(0, Math.min(L-1, Math.round(norm)));
+              const quantVal = (idx/(L-1))*255;
+              const err = oldPixel - quantVal;
+              if (x+1 < w) errorBuffer[y][x+1] += err * 7/16;
+              if (y+1 < h) {
+                if (x > 0) errorBuffer[y+1][x-1] += err * 3/16;
+                errorBuffer[y+1][x] += err * 5/16;
+                if (x+1 < w) errorBuffer[y+1][x+1] += err * 1/16;
+              }
+              ctx.fillStyle = pal[idx] || '#000000';
+              ctx.fillRect(px, py, size, size);
+            }
+            break;
+          }
+          case 'ascii':
+            // center ASCII char
+            ctx.font = `${cfg.fontSize}px ${cfg.font}`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            const variant = asciiVariants[cfg.asciiVariant] || asciiVariants.Default;
+            const idx = Math.floor((brightness/255)*(variant.length-1));
+            ctx.fillStyle = cfg.fgColor;
+            ctx.fillText(variant[idx], px + size/2, py + size/2);
+            break;
+          case 'brightness-map':
+            ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+            ctx.fillText(cfg.char, px, py);
+            break;
+          case 'binary-char': {
+            const isOn = brightness > cfg.threshold;
+            ctx.fillStyle = isOn ? cfg.fgColor : cfg.bgColor;
+            ctx.fillRect(px, py, size, size);
+            const idx = Math.floor((brightness/255)*9);
+            const pal = charPalettes[cfg.charPalette] || palette10;
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillStyle = pal[idx] || '#000000'; ctx.fillText(idx.toString(), px+size/2, py+size/2);
+            break;
+          }
+          case 'color-map':
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillText(cfg.char, px, py);
+            break;
+          case 'numbers-0-9-img':
+            const num9 = Math.floor((brightness/255)*9);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillText(num9.toString(), px, py);
+            break;
+          case 'numbers-0-9-palette': {
+            const pal = charPalettes[cfg.charPalette] || palette10;
+            const idxP = Math.floor((brightness/255)*(pal.length-1));
+            ctx.fillStyle = pal[idxP];
+            ctx.fillText(idxP.toString(), px, py);
+            break;
+          }
+          case 'letters-palette': {
+            const letters5 = ['E','T','O','V','Z'];
+            const pal = cfg.letterCount === 5
+              ? palette5Sets[cfg.palette5Name]
+              : charPalettes[cfg.charPalette] || palette10;
+            const idxP = Math.floor((brightness/255)*(pal.length-1));
+            // base index from brightness
+            let idxL = Math.floor((brightness/255)*(cfg.letterCount - 1));
+            if (cfg.letterCount === 5) {
+              // invert: darkest→Z (idx4), brightest→E (idx0)
+              idxL = (cfg.letterCount - 1) - idxL;
+            }
+            const ch = cfg.letterCount === 5 ? letters5[idxL] : String.fromCharCode(65 + idxL);
+            // for 5 letters, ensure Z (idx4) is black
+            const color = cfg.letterCount === 5 && idxL === cfg.letterCount - 1
+              ? '#000000'
+              : pal[idxP] || '#000000';
+            ctx.fillStyle = color;
+            ctx.fillText(ch, px + size/2, py + size/2);
+            break;
+          }
+          case 'letter-char': {
+            const isOn = brightness > cfg.threshold;
+            ctx.fillStyle = isOn ? cfg.fgColor : cfg.bgColor;
+            ctx.fillRect(px, py, size, size);
+            const idx = Math.floor((brightness/255)*(cfg.letterCount-1));
+            const pal = charPalettes[cfg.charPalette] || palette10;
+            const ch = String.fromCharCode(65 + idx);
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = pal[idx] || '#000000';
+            ctx.fillText(ch, px + size/2, py + size/2);
+            break;
+          }
+          case 'circle-palette': {
+            const pal = charPalettes[cfg.charPalette] || palette10;
+            const idx = Math.floor((brightness/255)*(pal.length-1));
+            const radius = (brightness/255)*(size/2);
+            ctx.beginPath();
+            ctx.arc(px + size/2, py + size/2, radius, 0, 2*Math.PI);
+            ctx.fillStyle = pal[idx] || '#000000';
+            ctx.fill();
+            break;
+          }
+          default:
+            break;
+        }
+      }
+    }
+    if (gifRecorder) gifRecorder.addFrame(canvas, { copy:true, delay:1000/30 });
+    // scheduling of draw loop is managed in startCamera via configRef
+  };
+
+  return (
+    <div className="App">
+      <header className="App-header">
+        <h1>Camera Effects</h1>
+        <button className="theme-toggle" onClick={()=>setTheme(theme==='light'?'dark':'light')}>
+          {theme==='light'?'Dark':'Light'} Mode
+        </button>
+      </header>
+      <main className="App-main">
+        <section className="preview">
+          <canvas ref={canvasRef} className="preview-canvas" />
+          <video ref={videoRef} style={{ display:'none' }} />
+        </section>
+        <aside className="controls">
+          <label>Mode
+            <select name="mode" value={config.mode} onChange={handleChange}>
+              <option value="video">Webcam</option>
+              <option value="video-file">Upload Video</option>
+              <option value="image">Image</option>
+            </select>
+          </label>
+          <label>Resolution
+            <select name="outputResolution" value={config.outputResolution} onChange={handleChange}>
+              <option value="native">Native</option>
+              <option value="4k">4K</option>
+              <option value="1080p">1080p</option>
+            </select>
+          </label>
+          {(config.mode==='video' || config.mode==='video-file') && (
+            <>
+              {config.mode==='video-file' && (
+                <>
+                  <label>Upload Video<input type="file" accept="video/*" onChange={handleVideoUpload}/></label>
+                  <button onClick={()=>videoRef.current.play().catch(console.error)} disabled={!videoFileLoaded}>Play</button>
+                  <button onClick={()=>videoRef.current.pause()} disabled={!videoFileLoaded}>Pause</button>
+                  <button onClick={downloadVideo} disabled={!videoFileLoaded}>Download Processed Video</button>
+                </>
+              )}
+              <label>Recording Format<select name="recordingFormat" value={config.recordingFormat} onChange={handleChange}>
+                <option value="webm">WebM</option>
+                <option value="mp4">MP4</option>
+                <option value="gif">GIF</option>
+              </select></label>
+              <button onClick={startRecording} disabled={!!recorder||!!gifRecorder}>Start Recording</button>
+              <button onClick={stopRecording} disabled={!recorder&&!gifRecorder}>Stop & Download</button>
+            </>
+          )}
+          {config.mode==='image' && (
+            <>
+              <label>Upload Image<input type="file" accept="image/*" onChange={handleImageUpload} /></label>
+              <button onClick={downloadImage} disabled={!imageLoaded}>Download Image</button>
+            </>
+          )}
+          <label>Effect
+            <select name="effect" value={config.effect} onChange={handleChange}>
+              {effects.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </label>
+          {config.effect === 'decade' && (
+            <label>Decade Palette
+              <select name="decadePalette" value={config.decadePalette} onChange={handleChange}>
+                {Object.keys(decadePalettes).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+          )}
+          {config.effect === 'binary-char' && (
+            <label>Char Palette
+              <select name="charPalette" value={config.charPalette} onChange={handleChange}>
+                {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+          )}
+          {config.effect === 'numbers-0-9-palette' && (
+            <label>Char Palette
+              <select name="charPalette" value={config.charPalette} onChange={handleChange}>
+                {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+          )}
+          {config.effect === 'letters-palette' && (
+            <>
+              <label>Letter Count
+                <select name="letterCount" value={config.letterCount} onChange={handleChange}>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                </select>
+              </label>
+              <label>Palette
+                <select name={config.letterCount===5?'palette5Name':'charPalette'} value={config.letterCount===5?config.palette5Name:config.charPalette} onChange={handleChange}>
+                  {(config.letterCount===5?Object.keys(palette5Sets):Object.keys(charPalettes)).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </label>
+            </>
+          )}
+          {config.effect === 'letter-char' && (
+            <>
+              <label>Char Palette
+                <select name="charPalette" value={config.charPalette} onChange={handleChange}>
+                  {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </label>
+              <label>Letter Count
+                <select name="letterCount" value={config.letterCount} onChange={handleChange}>
+                  <option value={10}>10</option>
+                  <option value={26}>26</option>
+                </select>
+              </label>
+            </>
+          )}
+          {config.effect === 'dither' && (
+            <>
+              <label>Dither Method
+                <select name="ditherMethod" value={config.ditherMethod} onChange={handleChange}>
+                  <option value="ordered">Ordered</option>
+                  <option value="floyd">Error Diffusion</option>
+                </select>
+              </label>
+              <label>Char Palette
+                <select name="charPalette" value={config.charPalette} onChange={handleChange}>
+                  {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </label>
+            </>
+          )}
+          {config.effect === 'dither-ascii' && (
+            <>
+              <label>Dither Method
+                <select name="ditherMethod" value={config.ditherMethod} onChange={handleChange}>
+                  <option value="ordered">Ordered</option>
+                  <option value="floyd">Error Diffusion</option>
+                </select>
+              </label>
+              <label>Char Palette
+                <select name="charPalette" value={config.charPalette} onChange={handleChange}>
+                  {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </label>
+              {config.charPalette === 'Extracted' && (
+                <label>Extract Count
+                  <input type="number" name="extractCount" min="2" max="20" value={config.extractCount} onChange={handleChange} />
+                </label>
+              )}
+            </>
+          )}
+          {config.effect === 'circle-palette' && (
+            <label>Char Palette
+              <select name="charPalette" value={config.charPalette} onChange={handleChange}>
+                {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+          )}
+          {(config.effect === 'ascii' || config.effect === 'dither-ascii') && (
+            <>
+              <label>ASCII Variant
+                <select name="asciiVariant" value={config.asciiVariant} onChange={handleChange}>
+                  {Object.keys(asciiVariants).map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </label>
+            </>
+          )}
+          <label>Foreground
+            <select name="fgColor" value={config.fgColor} onChange={handleChange}>
+              {presetColors.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </label>
+          <label>Background
+            <select name="bgColor" value={config.bgColor} onChange={handleChange}>
+              {presetColors.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </label>
+          <label>Threshold
+            <input type="range" name="threshold" min="0" max="255" value={config.threshold} onChange={handleChange} />
+            <span>{config.threshold}</span>
+          </label>
+          <label>Pixel Size
+            <input type="range" name="pixelSize" min="2" max="100" value={config.pixelSize} onChange={handleChange} />
+            <span>{config.pixelSize}</span>
+            <button onClick={() => setConfig(prev => ({ ...prev, fontSize: prev.pixelSize }))}>Snap Font</button>
+          </label>
+          <label>Font Size
+            <input type="range" name="fontSize" min="8" max="100" value={config.fontSize} onChange={handleChange} />
+            <span>{config.fontSize}px</span>
+          </label>
+          <label>Upload Font <input type="file" accept=".ttf,.otf" onChange={handleFontUpload} /></label>
+          <label>Font
+            <select name="font" value={config.font} onChange={handleChange}>{fontsList.map(f=><option key={f} value={f}>{f}</option>)}</select>
+          </label>
+          <label>Char
+            <input type="text" name="char" value={config.char} onChange={handleChange} maxLength={1} />
+          </label>
+          <label>Transparent Background
+            <input type="checkbox" name="transparentBg" checked={config.transparentBg} onChange={handleChange} />
+          </label>
+        </aside>
+      </main>
+    </div>
+  );
+}
+
+export default App;

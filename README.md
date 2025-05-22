@@ -68,3 +68,77 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+# Effects & Settings
+
+## Effects
+
+### channel
+Splits the image into its red, green, and blue channel intensity maps, rendering each channel as a separate grayscale block.
+
+### two-tone
+Renders each pixel block in either the foreground color or background color based on the brightness threshold.
+
+### binary
+Similar to two-tone but fills fixed-size blocks with fg/bg colors according to threshold.
+
+### decade
+Groups brightness into numeric decades (0–9) and maps each decade to a color from the selected `decadePalette`. Controlled by `extractCount`.
+
+### ascii
+Converts pixel brightness to ASCII characters, rendering a character grid. Uses `asciiVariant`, `font`, `fontSize`, and colors from `charPalette`. Optionally overlays ASCII over the live video/image when `asciiUnderlay` is enabled.
+
+### dither
+Applies an 8×8 ordered or Floyd–Steinberg dithering algorithm to approximate shades using a limited palette. Controlled by `ditherMethod` and `ditherPalette`.
+
+### dither-ascii
+Combines dithering with ASCII mapping: first dithers the image, then renders ASCII characters based on dithered brightness.
+
+### green-screen
+Detects green-dominant pixels and replaces them with the chosen `bgColor`. If `removeGreen` is true, characters or blocks over green areas are omitted.
+
+### binary-char
+Renders threshold-based blocks and overlays a numeric character (0–9) indicating brightness level. Settings: `threshold`, `charPalette`, `fgColor`, `bgColor`.
+
+### letter-char
+Renders blocks filled by threshold and overlays a custom `char` on each block. Controlled by `threshold`, `char`, `font`, `fontSize`, `fgColor`, `bgColor`.
+
+### letters-palette
+Fills blocks with colors from `paletteName` and overlays letters from a preset list sized by `letterCount`. Uses `fgColor` for text.
+
+### palette
+Renders blocks in the nearest palette color (`paletteName`) and optionally overlays numbers or characters based on `overlayType` (`none`, `number`, `character`).
+
+### edge
+Applies a convolution edge-detection filter to highlight contours in high contrast. Adjustable via `threshold`, `fgColor`, `bgColor`.
+
+## Settings
+
+| Name               | Type                             | Default   | Description                                                                                   |
+|--------------------|----------------------------------|-----------|-----------------------------------------------------------------------------------------------|
+| mode               | 'video'  'video-file'  'image' | video     | Source: webcam, uploaded video, or uploaded image.                                             |
+| effect             | string                           | channel   | Active effect to apply (see Effects above).                                                   |
+| fgColor            | string (hex)                     | #FFFFFF   | Foreground/text color.                                                                        |
+| bgColor            | string (hex)                     | #000000   | Background color.                                                                             |
+| threshold          | number (0–255)                   | 128       | Brightness cutoff for threshold-based effects.                                                |
+| pixelSize          | number (px)                      | 20        | Size of pixel blocks for pixelated effects.                                                   |
+| font               | string                           | Arial     | Font family for text overlays.                                                                |
+| fontSize           | number (px)                      | 20        | Font size for text overlays.                                                                  |
+| recordingFormat    | 'mp4'  'gif'               | mp4       | Format for recording canvas output.                                                           |
+| decadePalette      | string                           | Default   | Name of color palette used by Decade effect.                                                  |
+| charPalette        | string                           | Default   | Name of color palette used by character-based effects.                                        |
+| ditherPalette      | string                           | Default   | Name of palette used for dithering effects.                                                   |
+| ditherMethod       | 'ordered'  'floyd'         | ordered   | Dithering algorithm: ordered matrix or Floyd–Steinberg error diffusion.                        |
+| smoothFactor       | number (0–1)                     | 1         | Interpolation for real-time smoothing (0 = static frame).                                     |
+| char               | string                           | .         | Character to render in char-based overlays.                                                   |
+| letterCount        | number                           | 10        | Number of letters to map in Letters-Palette effect.                                           |
+| extractCount       | number                           | 8         | Number of brightness levels/groups in Decade effect.                                          |
+| asciiVariant       | string                           | Default   | ASCII character set variant for ASCII-based effects.                                          |
+| asciiMapping       | 'static'  'dynamic'       | dynamic   | Static uses fixed mapping; dynamic adjusts mapping per frame.                                  |
+| transparentBg      | boolean                          | false     | Render a transparent background instead of solid bgColor.                                     |
+| outputResolution   | 'native'  '1080p'  '4k' | native    | Canvas resolution mode: source native, 1080p, or full 4K.                                     |
+| imageDownloadType  | string                           | png4x     | Download format for images (e.g. png, png4x, svg).                                            |
+| overlayType        | 'none'  'number'  'character' | number    | Overlay style for Palette effect; none, numeric index, or custom character.                  |
+| removeGreen        | boolean                          | false     | Omit or mask green areas in Green-Screen effect.                                              |
+| asciiUnderlay      | boolean                          | false     | Draws the underlying source beneath ASCII characters when enabled.                             |
+|--------------------|----------------------------------|-----------|-----------------------------------------------------------------------------------------------|
