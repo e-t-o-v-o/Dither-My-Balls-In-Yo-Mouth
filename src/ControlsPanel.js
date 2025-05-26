@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   presetColors,
   effects,
@@ -33,26 +33,14 @@ export default function ControlsPanel(props) {
   } = props;
 
   const [activeTab, setActiveTab] = useState('Input');
-  const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
-  const tabs = ['Input','Effects','Settings','Presets'];
-  const handleTouchStart = e => { touchStartX.current = e.changedTouches[0].clientX; };
-  const handleTouchMove = e => { touchEndX.current = e.changedTouches[0].clientX; };
-  const handleTouchEnd = () => {
-    const delta = touchStartX.current - touchEndX.current;
-    const threshold = 50;
-    const idx = tabs.indexOf(activeTab);
-    if (delta > threshold && idx < tabs.length - 1) setActiveTab(tabs[idx+1]);
-    else if (delta < -threshold && idx > 0) setActiveTab(tabs[idx-1]);
-  };
+  const tabs = ['Input','Effects','Settings'];
 
   return (
-    <aside className="controls" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+    <aside className="controls">
       <div className="tab-bar">
         <button className={activeTab === 'Input' ? 'active' : ''} onClick={() => setActiveTab('Input')}>📹 Input</button>
         <button className={activeTab === 'Effects' ? 'active' : ''} onClick={() => setActiveTab('Effects')}>🎨 Effects</button>
         <button className={activeTab === 'Settings' ? 'active' : ''} onClick={() => setActiveTab('Settings')}>⚙️ Settings</button>
-        <button className={activeTab === 'Presets' ? 'active' : ''} onClick={() => setActiveTab('Presets')}>💾 Presets</button>
       </div>
 
       {activeTab === 'Input' && (
@@ -363,19 +351,6 @@ export default function ControlsPanel(props) {
           <label>Char
             <input type="text" name="char" value={config.char} onChange={handleChange} maxLength={1} />
           </label>
-        </>
-      )}
-
-      {activeTab === 'Presets' && (
-        <>
-          <select value={selectedPreset} onChange={onLoadPreset}>
-            <option value="">-- Select Preset --</option>
-            {Object.keys(presets).map(name => <option key={name} value={name}>{name}</option>)}
-          </select>
-          <button onClick={onSavePreset}>Save</button>
-          <button onClick={onDeletePreset} disabled={!selectedPreset}>Delete</button>
-          <button onClick={onExportPresets}>Export</button>
-          <input type="file" accept="application/json" onChange={onImportPresets} />
         </>
       )}
     </aside>

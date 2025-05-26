@@ -4,7 +4,6 @@ import GIF from 'gif.js/dist/gif.js';
 import ControlsPanel from './ControlsPanel';
 import { fonts, charPalettes, palette10, decadePalettes, asciiVariants, paletteSets } from './constants';
 import C2S from 'canvas2svg';
-import GLPreview from './GLPreview';
 
 // Load saved config and define initial settings
 const defaultConfig = {
@@ -40,6 +39,7 @@ function App() {
   const [config, dispatch] = useReducer(configReducer, initialConfig);
   const [fontsList, setFontsList] = useState(fonts);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // Apply theme to document root and save preference
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -869,8 +869,9 @@ function App() {
   }, [handleImageUpload, handleVideoUpload]);
 
   return (
-    <div className="App" onDragOver={e => e.preventDefault()} onDrop={handleDrop}>
+    <div className="App">
       <header className="App-header">
+        <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
         <h1>Camera Effects</h1>
         <button className="theme-toggle" onClick={()=>setTheme(theme==='light'?'dark':'light')}>
           {theme==='light'?'Dark':'Light'} Mode
@@ -880,38 +881,39 @@ function App() {
       <main className="App-main">
         <section className="preview">
           <canvas ref={canvasRef} className="preview-canvas" />
-          <video
-            ref={videoRef}
-            style={{ display: 'block', width: '100%', height: 'auto' }}
-            muted
-            playsInline
-            autoPlay
-          />
         </section>
-        <ControlsPanel
-          config={config}
-          dispatch={dispatch}
-          handleChange={handleChange}
-          handleVideoUpload={handleVideoUpload}
-          handleVideoPlay={handleVideoPlay}
-          handleVideoPause={handleVideoPause}
-          handleImageUpload={handleImageUpload}
-          handleFontUpload={handleFontUpload}
-          startRecording={startRecording}
-          stopRecording={stopRecording}
-          downloadSVG={downloadSVG}
-          downloadHighResPNG={downloadHighResPNG}
-          downloadVideo={downloadVideo}
-          videoFileLoaded={videoFileLoaded}
-          imageLoaded={imageLoaded}
-          recorder={recorder}
-          gifRecorder={gifRecorder}
-          fontsList={fontsList}
-          presets={presets} selectedPreset={selectedPreset}
-          onSavePreset={savePreset} onLoadPreset={loadPreset} onDeletePreset={deletePreset}
-          onExportPresets={exportPresets} onImportPresets={importPresets}
-        />
+        <nav className={`sidebar ${sidebarOpen ? 'open' : ''}`}> 
+          <ControlsPanel
+            config={config}
+            dispatch={dispatch}
+            handleChange={handleChange}
+            handleVideoUpload={handleVideoUpload}
+            handleVideoPlay={handleVideoPlay}
+            handleVideoPause={handleVideoPause}
+            handleImageUpload={handleImageUpload}
+            handleFontUpload={handleFontUpload}
+            startRecording={startRecording}
+            stopRecording={stopRecording}
+            downloadSVG={downloadSVG}
+            downloadHighResPNG={downloadHighResPNG}
+            downloadVideo={downloadVideo}
+            videoFileLoaded={videoFileLoaded}
+            imageLoaded={imageLoaded}
+            recorder={recorder}
+            gifRecorder={gifRecorder}
+            fontsList={fontsList}
+          />
+        </nav>
       </main>
+      <div className={`backdrop ${sidebarOpen ? 'show' : ''}`} onClick={() => setSidebarOpen(false)} />
+      {/* Hidden video element for frame source */}
+      <video
+        ref={videoRef}
+        style={{ display: 'none' }}
+        muted
+        playsInline
+        autoPlay
+      />
     </div>
   );
 }
