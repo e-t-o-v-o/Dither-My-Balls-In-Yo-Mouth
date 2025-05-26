@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   presetColors,
   effects,
@@ -33,9 +33,21 @@ export default function ControlsPanel(props) {
   } = props;
 
   const [activeTab, setActiveTab] = useState('Input');
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+  const tabs = ['Input','Effects','Settings','Presets'];
+  const handleTouchStart = e => { touchStartX.current = e.changedTouches[0].clientX; };
+  const handleTouchMove = e => { touchEndX.current = e.changedTouches[0].clientX; };
+  const handleTouchEnd = () => {
+    const delta = touchStartX.current - touchEndX.current;
+    const threshold = 50;
+    const idx = tabs.indexOf(activeTab);
+    if (delta > threshold && idx < tabs.length - 1) setActiveTab(tabs[idx+1]);
+    else if (delta < -threshold && idx > 0) setActiveTab(tabs[idx-1]);
+  };
 
   return (
-    <aside className="controls">
+    <aside className="controls" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
       <div className="tab-bar">
         <button className={activeTab === 'Input' ? 'active' : ''} onClick={() => setActiveTab('Input')}>📹 Input</button>
         <button className={activeTab === 'Effects' ? 'active' : ''} onClick={() => setActiveTab('Effects')}>🎨 Effects</button>
@@ -124,170 +136,172 @@ export default function ControlsPanel(props) {
       )}
 
       {activeTab === 'Effects' && (
-        <>
-          <label>Effect
-            <select name="effect" value={config.effect} onChange={handleChange}>
-              {effects.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-          </label>
-
-          {config.effect === 'palette' && (
-            <>
-              <label>Palette</label>
-              <div className="swatch-panel">
-                <div className="swatches">
-                  {Object.entries(paletteSets).map(([name, colors]) => (
-                    <div
-                      key={name}
-                      className={`palette-swatch${config.paletteName === name ? ' selected' : ''}`}
-                      onClick={() => dispatch({ type: 'SET', name: 'paletteName', value: name })}
-                    >
-                      {colors.map(col => <div key={col} className="swatch" style={{ background: col }} />)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <label>Or choose from list</label>
-              <select name="paletteName" value={config.paletteName} onChange={handleChange}>
-                {Object.keys(paletteSets).map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <label>Overlay</label>
-              <select name="overlayType" value={config.overlayType} onChange={handleChange}>
-                <option value="none">None</option>
-                <option value="number">Number</option>
-                <option value="character">Character</option>
-              </select>
-            </>
-          )}
-
-          {config.effect === 'decade' && (
-            <>
-              <label>Decade Palette</label>
-              <div className="swatch-panel">
-                <div className="swatches">
-                  {Object.entries(decadePalettes).map(([name, colors]) => (
-                    <div
-                      key={name}
-                      className={`palette-swatch${config.decadePalette === name ? ' selected' : ''}`}
-                      onClick={() => dispatch({ type: 'SET', name: 'decadePalette', value: name })}
-                    >
-                      {colors.map(col => <div key={col} className="swatch" style={{ background: col }} />)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <label>Or choose from list</label>
-              <select name="decadePalette" value={config.decadePalette} onChange={handleChange}>
-                {Object.keys(decadePalettes).map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </>
-          )}
-
-          {config.effect === 'dither' && (
-            <>
-              <label>Dither Palette
-                <select name="ditherPalette" value={config.ditherPalette} onChange={handleChange}>
-                  {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </label>
-              <label>Dither Method
-                <select name="ditherMethod" value={config.ditherMethod} onChange={handleChange}>
-                  <option value="ordered">Ordered</option>
-                  <option value="floyd">Floyd–Steinberg</option>
-                  <option value="jarvis">Jarvis–Judice–Ninke</option>
-                  <option value="burkes">Burkes</option>
-                  <option value="sierra">Sierra</option>
-                  <option value="atkinson">Atkinson</option>
-                </select>
-              </label>
-            </>
-          )}
-
-          {config.effect === 'dither-ascii' && (
-            <>
-              <label>Dither Palette
-                <select name="ditherPalette" value={config.ditherPalette} onChange={handleChange}>
-                  {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </label>
-              <label>Dither Method
-                <select name="ditherMethod" value={config.ditherMethod} onChange={handleChange}>
-                  <option value="ordered">Ordered</option>
-                  <option value="floyd">Floyd–Steinberg</option>
-                  <option value="jarvis">Jarvis–Judice–Ninke</option>
-                  <option value="burkes">Burkes</option>
-                  <option value="sierra">Sierra</option>
-                  <option value="atkinson">Atkinson</option>
-                </select>
-              </label>
-              <label>ASCII Palette
-                <select name="charPalette" value={config.charPalette} onChange={handleChange}>
-                  {Object.entries(charPalettes).map(([p, cols]) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </label>
-              <label>ASCII Mapping
-                <select name="asciiMapping" value={config.asciiMapping} onChange={handleChange}>
-                  <option value="dynamic">Dynamic</option>
-                  <option value="static">Ordered</option>
-                </select>
-              </label>
-            </>
-          )}
-
-          {['binary-char', 'numbers-0-9-palette', 'letter-char', 'circle-palette', 'letters-palette'].includes(config.effect) && (
-            <label>Char Palette
-              <select name="charPalette" value={config.charPalette} onChange={handleChange}>
-                {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
+        <div className="effects-container">
+          <div className="effects-inner">
+            <label>Effect
+              <select name="effect" value={config.effect} onChange={handleChange}>
+                {effects.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
             </label>
-          )}
 
-          {(config.effect === 'ascii' || config.effect === 'dither-ascii' || config.effect === 'dither' || config.effect === 'two-tone') && (
-            <>
-              <label>ASCII Variant
-                <select name="asciiVariant" value={config.asciiVariant} onChange={handleChange}>
-                  {Object.keys(asciiVariants).map(v => <option key={v} value={v}>{v}</option>)}
+            {config.effect === 'palette' && (
+              <>
+                <label>Palette</label>
+                <div className="swatch-panel">
+                  <div className="swatches">
+                    {Object.entries(paletteSets).map(([name, colors]) => (
+                      <div
+                        key={name}
+                        className={`palette-swatch${config.paletteName === name ? ' selected' : ''}`}
+                        onClick={() => dispatch({ type: 'SET', name: 'paletteName', value: name })}
+                      >
+                        {colors.map(col => <div key={col} className="swatch" style={{ background: col }} />)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <label>Or choose from list</label>
+                <select name="paletteName" value={config.paletteName} onChange={handleChange}>
+                  {Object.keys(paletteSets).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  name="removeGreen"
-                  checked={config.removeGreen}
-                  onChange={handleChange}
-                /> Remove Green Screen
-              </label>
-              {config.effect === 'two-tone' && config.removeGreen && (
-                <label>
-                  Green Replace Color
-                  <input
-                    type="color"
-                    name="greenReplaceColor"
-                    value={config.greenReplaceColor}
-                    onChange={handleChange}
-                  />
+                <label>Overlay</label>
+                <select name="overlayType" value={config.overlayType} onChange={handleChange}>
+                  <option value="none">None</option>
+                  <option value="number">Number</option>
+                  <option value="character">Character</option>
+                </select>
+              </>
+            )}
+
+            {config.effect === 'decade' && (
+              <>
+                <label>Decade Palette</label>
+                <div className="swatch-panel">
+                  <div className="swatches">
+                    {Object.entries(decadePalettes).map(([name, colors]) => (
+                      <div
+                        key={name}
+                        className={`palette-swatch${config.decadePalette === name ? ' selected' : ''}`}
+                        onClick={() => dispatch({ type: 'SET', name: 'decadePalette', value: name })}
+                      >
+                        {colors.map(col => <div key={col} className="swatch" style={{ background: col }} />)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <label>Or choose from list</label>
+                <select name="decadePalette" value={config.decadePalette} onChange={handleChange}>
+                  {Object.keys(decadePalettes).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </>
+            )}
+
+            {config.effect === 'dither' && (
+              <>
+                <label>Dither Palette
+                  <select name="ditherPalette" value={config.ditherPalette} onChange={handleChange}>
+                    {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
                 </label>
-              )}
-            </>
-          )}
-          {config.effect === 'ascii' && (
-            <>
-              <label>ASCII Palette
+                <label>Dither Method
+                  <select name="ditherMethod" value={config.ditherMethod} onChange={handleChange}>
+                    <option value="ordered">Ordered</option>
+                    <option value="floyd">Floyd–Steinberg</option>
+                    <option value="jarvis">Jarvis–Judice–Ninke</option>
+                    <option value="burkes">Burkes</option>
+                    <option value="sierra">Sierra</option>
+                    <option value="atkinson">Atkinson</option>
+                  </select>
+                </label>
+              </>
+            )}
+
+            {config.effect === 'dither-ascii' && (
+              <>
+                <label>Dither Palette
+                  <select name="ditherPalette" value={config.ditherPalette} onChange={handleChange}>
+                    {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </label>
+                <label>Dither Method
+                  <select name="ditherMethod" value={config.ditherMethod} onChange={handleChange}>
+                    <option value="ordered">Ordered</option>
+                    <option value="floyd">Floyd–Steinberg</option>
+                    <option value="jarvis">Jarvis–Judice–Ninke</option>
+                    <option value="burkes">Burkes</option>
+                    <option value="sierra">Sierra</option>
+                    <option value="atkinson">Atkinson</option>
+                  </select>
+                </label>
+                <label>ASCII Palette
+                  <select name="charPalette" value={config.charPalette} onChange={handleChange}>
+                    {Object.entries(charPalettes).map(([p, cols]) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </label>
+                <label>ASCII Mapping
+                  <select name="asciiMapping" value={config.asciiMapping} onChange={handleChange}>
+                    <option value="dynamic">Dynamic</option>
+                    <option value="static">Ordered</option>
+                  </select>
+                </label>
+              </>
+            )}
+
+            {['binary-char', 'numbers-0-9-palette', 'letter-char', 'circle-palette', 'letters-palette'].includes(config.effect) && (
+              <label>Char Palette
                 <select name="charPalette" value={config.charPalette} onChange={handleChange}>
-                  {Object.entries(charPalettes).map(([p, cols]) => <option key={p} value={p}>{p}</option>)}
+                  {Object.keys(charPalettes).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </label>
-              <label>
-                <input
-                  type="checkbox"
-                  name="asciiUnderlay"
-                  checked={config.asciiUnderlay}
-                  onChange={handleChange}
-                /> Show Underlying Video
-              </label>
-            </>
-          )}
-        </>
+            )}
+
+            {(config.effect === 'ascii' || config.effect === 'dither-ascii' || config.effect === 'dither' || config.effect === 'two-tone') && (
+              <>
+                <label>ASCII Variant
+                  <select name="asciiVariant" value={config.asciiVariant} onChange={handleChange}>
+                    {Object.keys(asciiVariants).map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    name="removeGreen"
+                    checked={config.removeGreen}
+                    onChange={handleChange}
+                  /> Remove Green Screen
+                </label>
+                {config.effect === 'two-tone' && config.removeGreen && (
+                  <label>
+                    Green Replace Color
+                    <input
+                      type="color"
+                      name="greenReplaceColor"
+                      value={config.greenReplaceColor}
+                      onChange={handleChange}
+                    />
+                  </label>
+                )}
+              </>
+            )}
+            {config.effect === 'ascii' && (
+              <>
+                <label>ASCII Palette
+                  <select name="charPalette" value={config.charPalette} onChange={handleChange}>
+                    {Object.entries(charPalettes).map(([p, cols]) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    name="asciiUnderlay"
+                    checked={config.asciiUnderlay}
+                    onChange={handleChange}
+                  /> Show Underlying Video
+                </label>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {activeTab === 'Settings' && (

@@ -4,6 +4,7 @@ import GIF from 'gif.js/dist/gif.js';
 import ControlsPanel from './ControlsPanel';
 import { fonts, charPalettes, palette10, decadePalettes, asciiVariants, paletteSets } from './constants';
 import C2S from 'canvas2svg';
+import GLPreview from './GLPreview';
 
 // Load saved config and define initial settings
 const defaultConfig = {
@@ -839,15 +840,26 @@ function App() {
   };
 
   useEffect(() => {
-    console.log('[App] Initializing dither worker');
-    ditherWorkerRef.current = new Worker('/ditherWorker.js');
-    ditherWorkerRef.current.onerror = e => console.error('Dither worker error', e.message, e);
-    ditherWorkerRef.current.onmessage = (e) => {
-      latestBitmapRef.current = e.data.bitmap;
-      pendingRef.current = false;
+    const needDither = config.effect === 'dither' || config.effect === 'dither-ascii';
+    if (needDither && !ditherWorkerRef.current) {
+      ditherWorkerRef.current = new Worker('/ditherWorker.js');
+      ditherWorkerRef.current.onerror = e => console.error('Dither worker error', e.message, e);
+      ditherWorkerRef.current.onmessage = e => {
+        latestBitmapRef.current = e.data.bitmap;
+        pendingRef.current = false;
+      };
+    }
+    if (!needDither && ditherWorkerRef.current) {
+      ditherWorkerRef.current.terminate();
+      ditherWorkerRef.current = null;
+    }
+    return () => {
+      if (ditherWorkerRef.current) {
+        ditherWorkerRef.current.terminate();
+        ditherWorkerRef.current = null;
+      }
     };
-    return () => ditherWorkerRef.current.terminate();
-  }, []);
+  }, [config.effect]);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
@@ -870,7 +882,7 @@ function App() {
           <canvas ref={canvasRef} className="preview-canvas" />
           <video
             ref={videoRef}
-            style={{ display: 'none' }}
+            style={{ display: 'block', width: '100%', height: 'auto' }}
             muted
             playsInline
             autoPlay

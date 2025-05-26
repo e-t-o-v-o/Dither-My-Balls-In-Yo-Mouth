@@ -392,3 +392,41 @@ details[open] > *:not(summary) {
     object-fit: contain !important;
   }
 }
+
+/* Mobile layout override to allow full preview and controls scrolling */
+@media (max-width: 768px) {
+  .App-main {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+  .App-main .preview,
+  .App-main .controls {
+    flex: none !important;
+    width: 100% !important;
+  }
+}
+
+/* Final mobile layout flex override for preview and controls */
+@media (max-width: 768px) {
+  .App-main {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100vh - var(--header-height, 4rem)) !important;
+    overflow: hidden !important;
+  }
+  .preview {
+    flex: 1 !important;
+    min-height: 0 !important;
+  }
+  .preview-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+  }
+  .controls {
+    flex: none !important;
+    max-height: 40vh !important;
+    overflow-y: auto !important;
+  }
+}
