@@ -169,6 +169,7 @@ export default function ControlsPanel(props) {
                   <option value="none">None</option>
                   <option value="number">Number</option>
                   <option value="character">Character</option>
+                  {Object.keys(asciiVariants).map(v => <option key={v} value={v}>{v}</option>)}
                 </select>
               </>
             )}

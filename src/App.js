@@ -354,6 +354,11 @@ function App() {
               } else if (cfg.overlayType === 'character') {
                 ctx.fillStyle = cfg.fgColor;
                 ctx.fillText(cfg.char, px + size/2, py + size/2);
+              } else if (asciiVariants[cfg.overlayType]) {
+                const variant = asciiVariants[cfg.overlayType];
+                const charIdx = Math.min(variant.length - 1, Math.floor(idxP * variant.length / pal.length));
+                ctx.fillStyle = cfg.fgColor;
+                ctx.fillText(variant[charIdx], px + size/2, py + size/2);
               }
             }
             break;
