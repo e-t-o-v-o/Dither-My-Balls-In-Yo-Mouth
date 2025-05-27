@@ -35,7 +35,9 @@ export default function ControlsPanel(props) {
     onDeletePreset, 
     onExportPresets, 
     onImportPresets,
-    handleSwitchCamera
+    handleSwitchCamera,
+    theme,
+    toggleTheme
   } = props;
 
   const [activeTab, setActiveTab] = useState('Input');
@@ -304,6 +306,9 @@ export default function ControlsPanel(props) {
 
       {activeTab === 'Settings' && (
         <>
+          <label>
+            <input type="checkbox" name="darkMode" checked={theme === 'dark'} onChange={toggleTheme} /> Dark Mode
+          </label>
           <label>Foreground
             <div className="swatch-panel">
               <div className="swatches">

@@ -58,10 +58,17 @@ html, body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 
-.App-header h1 {
+.App-header h1.app-title-full {
   margin: 0;
   font-size: 1.5rem;
   color: var(--accent-color);
+}
+
+.App-header h1.app-title-mobile {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  display: none;
 }
 
 .theme-toggle {
@@ -476,6 +483,16 @@ details[open] > *:not(summary) {
     max-height: 40vh !important;
     overflow-y: auto !important;
   }
+}
+
+/* Mobile header adjustments */
+@media (max-width: 767px) {
+  .App-header .theme-toggle { display: none; }
+  .app-title-full { display: none; }
+  .app-title-mobile { display: inline; }
+}
+@media (min-width: 768px) {
+  .app-title-mobile { display: none; }
 }
 
 /* Desktop layout: always show sidebar and hide menu-toggle/backdrop */

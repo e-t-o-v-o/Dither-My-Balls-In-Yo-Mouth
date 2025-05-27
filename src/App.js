@@ -46,6 +46,8 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+  // Theme toggle handler
+  const handleThemeToggle = useCallback(() => setTheme(prev => prev === 'light' ? 'dark' : 'light'), []);
   // Presets management
   const [presets, setPresets] = useState(() => JSON.parse(localStorage.getItem('presets') || '{}'));
   const [selectedPreset, setSelectedPreset] = useState('');
@@ -888,9 +890,12 @@ function App() {
     <div className="App">
       <header className="App-header">
         <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
-        <h1>Camera Effects</h1>
-        <button className="theme-toggle" onClick={()=>setTheme(theme==='light'?'dark':'light')}>
-          {theme==='light'?'Dark':'Light'} Mode
+        <h1 className="app-title">
+          <span className="app-title-full">Camera Effects</span>
+          <span className="app-title-mobile">CE</span>
+        </h1>
+        <button className="theme-toggle" onClick={handleThemeToggle}>
+          {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
         </button>
         {deferredPrompt && <button className="install-btn" onClick={installApp}>Install App</button>}
       </header>
@@ -918,6 +923,8 @@ function App() {
             recorder={recorder}
             gifRecorder={gifRecorder}
             fontsList={fontsList}
+            theme={theme}
+            toggleTheme={handleThemeToggle}
             handleSwitchCamera={handleSwitchCamera}
           />
         </nav>
