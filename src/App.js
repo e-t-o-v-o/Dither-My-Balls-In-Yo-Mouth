@@ -888,17 +888,7 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
-        <h1 className="app-title">
-          <span className="app-title-full">Camera Effects</span>
-          <span className="app-title-mobile">CE</span>
-        </h1>
-        <button className="theme-toggle" onClick={handleThemeToggle}>
-          {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-        </button>
-        {deferredPrompt && <button className="install-btn" onClick={installApp}>Install App</button>}
-      </header>
+      <button className="menu-tab" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
       <main className="App-main">
         <section className="preview">
           <canvas ref={canvasRef} className="preview-canvas" />
