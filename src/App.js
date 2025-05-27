@@ -16,11 +16,7 @@ const defaultConfig = {
   asciiVariant: 'Default',
   asciiMapping: 'dynamic',
   transparentBg: false,
-  imageDownloadType: 'png1x',
-  overlayType: 'number',
-  removeGreen: false,
-  greenReplaceColor: '#000000',
-  asciiUnderlay: false,
+  decadeLabelType: 'number',
 };
 
 const savedConfig = JSON.parse(localStorage.getItem('config') || 'null');
@@ -89,8 +85,6 @@ function App() {
   const imageRef = useRef(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [videoFileLoaded, setVideoFileLoaded] = useState(false);
-  const [videoTime, setVideoTime] = useState(0);
-  const [videoDuration, setVideoDuration] = useState(0);
   const ditherWorkerRef = useRef(null);
   const latestBitmapRef = useRef(null);
   const pendingRef = useRef(false);
@@ -331,7 +325,10 @@ function App() {
             const blockB = 0.299*pr + 0.587*pg + 0.114*pb;
             const txtColor = blockB > 128 ? '#000000' : '#FFFFFF';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillStyle = txtColor; ctx.fillText(idx10.toString(), px+size/2, py+size/2);
+            const labelToDraw = cfg.decadeLabelType === 'marathon3'
+              ? asciiVariants['Marathon v3'][idx10]
+              : idx10.toString();
+            ctx.fillStyle = txtColor; ctx.fillText(labelToDraw, px+size/2, py+size/2);
             break;
           }
           case 'palette': {
@@ -621,8 +618,6 @@ function App() {
     if (vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; }
     vid.src = url;
     dispatch({ type: 'SET', name: 'mode', value: 'video-file' });
-    vid.onloadedmetadata = () => setVideoDuration(vid.duration);
-    vid.ontimeupdate = () => setVideoTime(vid.currentTime);
     vid.onloadeddata = async () => {
       await vid.play();
       setVideoFileLoaded(true);
@@ -846,14 +841,6 @@ function App() {
     }
   };
 
-  const handleSeek = useCallback((time) => {
-    const vid = videoRef.current;
-    if (vid && vid.src) {
-      vid.currentTime = time;
-      setVideoTime(time);
-    }
-  }, []);
-
   const handleSwitchCamera = useCallback(async () => {
     const newFacing = facingMode === 'user' ? 'environment' : 'user';
     if (videoRef.current.srcObject) {
@@ -928,9 +915,6 @@ function App() {
             theme={theme}
             toggleTheme={handleThemeToggle}
             handleSwitchCamera={handleSwitchCamera}
-            videoTime={videoTime}
-            videoDuration={videoDuration}
-            handleSeek={handleSeek}
           />
         </nav>
       </main>

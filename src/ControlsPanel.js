@@ -37,21 +37,11 @@ export default function ControlsPanel(props) {
     onImportPresets,
     handleSwitchCamera,
     theme,
-    toggleTheme,
-    videoTime,
-    videoDuration,
-    handleSeek
+    toggleTheme
   } = props;
 
   const [activeTab, setActiveTab] = useState('Input');
   const tabs = ['Input','Effects','Settings'];
-
-  // Helper to format seconds to mm:ss
-  const formatTime = (secs) => {
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  };
 
   return (
     <aside className="controls">
@@ -79,18 +69,6 @@ export default function ControlsPanel(props) {
                   <button onClick={handleVideoPlay} disabled={!videoFileLoaded}>Play</button>
                   <button onClick={handleVideoPause} disabled={!videoFileLoaded}>Pause</button>
                   <button onClick={downloadVideo} disabled={!videoFileLoaded}>Download Processed Video</button>
-                  {/* Scrubbable timeline */}
-                  <label>Seek
-                    <input
-                      type="range"
-                      min={0}
-                      max={videoDuration}
-                      value={videoTime}
-                      step="0.1"
-                      onChange={e => handleSeek(parseFloat(e.target.value))}
-                    />
-                    <span>{formatTime(videoTime)}/{formatTime(videoDuration)}</span>
-                  </label>
                 </>
               )}
               <label>Recording Format
@@ -215,6 +193,12 @@ export default function ControlsPanel(props) {
                 <select name="decadePalette" value={config.decadePalette} onChange={handleChange}>
                   {Object.keys(decadePalettes).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
+                <label>Label Type
+                  <select name="decadeLabelType" value={config.decadeLabelType} onChange={handleChange}>
+                    <option value="number">Number</option>
+                    <option value="Marathon v3">Marathon 3</option>
+                  </select>
+                </label>
               </>
             )}
 
