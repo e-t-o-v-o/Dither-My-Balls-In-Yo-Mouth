@@ -887,7 +887,7 @@ function App() {
   }, [handleImageUpload, handleVideoUpload]);
 
   return (
-    <div className="App">
+    <div className="App" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
       <button className="menu-tab" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
       <main className="App-main">
         <section className="preview">
