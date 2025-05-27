@@ -89,6 +89,8 @@ function App() {
   const imageRef = useRef(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [videoFileLoaded, setVideoFileLoaded] = useState(false);
+  const [videoTime, setVideoTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
   const ditherWorkerRef = useRef(null);
   const latestBitmapRef = useRef(null);
   const pendingRef = useRef(false);
@@ -619,6 +621,8 @@ function App() {
     if (vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; }
     vid.src = url;
     dispatch({ type: 'SET', name: 'mode', value: 'video-file' });
+    vid.onloadedmetadata = () => setVideoDuration(vid.duration);
+    vid.ontimeupdate = () => setVideoTime(vid.currentTime);
     vid.onloadeddata = async () => {
       await vid.play();
       setVideoFileLoaded(true);
@@ -842,6 +846,14 @@ function App() {
     }
   };
 
+  const handleSeek = useCallback((time) => {
+    const vid = videoRef.current;
+    if (vid && vid.src) {
+      vid.currentTime = time;
+      setVideoTime(time);
+    }
+  }, []);
+
   const handleSwitchCamera = useCallback(async () => {
     const newFacing = facingMode === 'user' ? 'environment' : 'user';
     if (videoRef.current.srcObject) {
@@ -916,6 +928,9 @@ function App() {
             theme={theme}
             toggleTheme={handleThemeToggle}
             handleSwitchCamera={handleSwitchCamera}
+            videoTime={videoTime}
+            videoDuration={videoDuration}
+            handleSeek={handleSeek}
           />
         </nav>
       </main>
