@@ -40,6 +40,7 @@ function App() {
   const [fontsList, setFontsList] = useState(fonts);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [facingMode, setFacingMode] = useState('user');
   // Apply theme to document root and save preference
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -586,7 +587,7 @@ function App() {
       const cfg = configRef.current;
       if (cfg.mode === 'video' && !camStream) {
         try {
-          camStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+          camStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: facingMode } });
           videoRef.current.srcObject = camStream;
           await videoRef.current.play();
         } catch (err) {
@@ -607,7 +608,7 @@ function App() {
       cancelAnimationFrame(rafId);
       if (camStream) camStream.getTracks().forEach(t => t.stop());
     };
-  }, [config.mode, videoFileLoaded, imageLoaded, draw]);
+  }, [config.mode, videoFileLoaded, imageLoaded, draw, facingMode]);
 
   const handleVideoUpload = useCallback((e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -839,6 +840,21 @@ function App() {
     }
   };
 
+  const handleSwitchCamera = useCallback(async () => {
+    const newFacing = facingMode === 'user' ? 'environment' : 'user';
+    if (videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: newFacing } });
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+      setFacingMode(newFacing);
+    } catch (err) {
+      console.error('Switch camera error', err);
+    }
+  }, [facingMode]);
+
   useEffect(() => {
     const needDither = config.effect === 'dither' || config.effect === 'dither-ascii';
     if (needDither && !ditherWorkerRef.current) {
@@ -902,6 +918,7 @@ function App() {
             recorder={recorder}
             gifRecorder={gifRecorder}
             fontsList={fontsList}
+            handleSwitchCamera={handleSwitchCamera}
           />
         </nav>
       </main>

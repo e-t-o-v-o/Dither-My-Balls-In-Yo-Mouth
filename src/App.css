@@ -116,10 +116,11 @@ html, body {
   scroll-behavior: smooth;
 }
 
+/* Drawer hidden fully off-screen on mobile */
 .sidebar {
   position: fixed;
   top: 64px; /* header height */
-  left: -300px;
+  left: -100%;
   width: 80%;
   max-width: 300px;
   height: calc(100% - 64px);

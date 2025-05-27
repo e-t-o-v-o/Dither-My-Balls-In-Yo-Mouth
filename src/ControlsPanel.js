@@ -28,8 +28,14 @@ export default function ControlsPanel(props) {
     recorder,
     gifRecorder,
     fontsList,
-    presets, selectedPreset,
-    onSavePreset, onLoadPreset, onDeletePreset, onExportPresets, onImportPresets
+    presets, 
+    selectedPreset,
+    onSavePreset, 
+    onLoadPreset, 
+    onDeletePreset, 
+    onExportPresets, 
+    onImportPresets,
+    handleSwitchCamera
   } = props;
 
   const [activeTab, setActiveTab] = useState('Input');
@@ -90,6 +96,10 @@ export default function ControlsPanel(props) {
                   <option value="4k">4k</option>
                 </select>
               </label>
+              {/* Camera switcher for mobile */}
+              {config.mode === 'video' && (
+                <button onClick={handleSwitchCamera}>Switch Camera</button>
+              )}
             </>
           )}
 
