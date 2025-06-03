@@ -15,6 +15,7 @@ const defaultConfig = {
   letterCount: 10, outputResolution: 'native', paletteName: 'Channel Colors', ditherMethod: 'ordered', extractCount: 8,
   asciiVariant: 'Default',
   asciiMapping: 'dynamic',
+  greenReplaceColor: '#000000',
   transparentBg: false,
   decadeLabelType: 'number',
 };

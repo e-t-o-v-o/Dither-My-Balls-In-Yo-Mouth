@@ -277,7 +277,7 @@ export default function ControlsPanel(props) {
                     onChange={handleChange}
                   /> Remove Green Screen
                 </label>
-                {config.effect === 'two-tone' && config.removeGreen && (
+                {config.removeGreen && (
                   <label>
                     Green Replace Color
                     <input
