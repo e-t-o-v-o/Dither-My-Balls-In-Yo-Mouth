@@ -74,6 +74,7 @@ export class FrameRenderer {
     height,
     overrideContext = null,
     time = source.timestamp ?? null,
+    flatten = false,
   ) {
     resize(canvas, width, height);
     const ctx = overrideContext || canvas.getContext("2d");
@@ -126,7 +127,8 @@ export class FrameRenderer {
     if (c.effect === "edge") data = edge(data, w, h, c.threshold);
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, width, height);
-    if (!c.transparent) {
+    // Flatten the final composition without changing transparent effect semantics.
+    if (!c.transparent || flatten) {
       ctx.fillStyle = c.bgColor;
       ctx.fillRect(0, 0, width, height);
     }

@@ -145,7 +145,9 @@ test("an excluded mask keeps the original raster and embedded SVG backdrop", asy
   new FrameRenderer().render(input, createCanvas(40, 40), c, 40, 40, svg);
   // Skia's SVG loader omits embedded images; inspect the embedded PNG itself.
   // The complete SVG composition is also checked in the browser.
-  const embedded=svg.serialize().match(/xlink:href="data:image\/png;base64,([^"]+)"/);
+  const embedded = svg
+    .serialize()
+    .match(/xlink:href="data:image\/png;base64,([^"]+)"/);
   expect(embedded).not.toBeNull();
   const decoded = await loadImage(Buffer.from(embedded[1], "base64"));
   canvas.getContext("2d").drawImage(decoded, 0, 0);
@@ -163,4 +165,77 @@ test("symbol accents are repeatable and do not leave pixels from the previous fr
   renderer.render(input, canvas, { ...c, effect: "mosaic" }, 192, 108);
   renderer.render(input, canvas, c, 192, 108);
   expect(canvas.toBuffer("image/png")).toEqual(first);
+});
+
+test.each(
+  ["two-tone", "edge", "halftone", "mosaic", "symbols"].flatMap((effect) =>
+    [true, false].map((backdrop) => [effect, backdrop]),
+  ),
+)(
+  "%s opaque export matches flattening its transparent composition (source backdrop: %s)",
+  (effect, maskBackdrop) => {
+    const input = source();
+    const c = {
+      ...defaults,
+      effect,
+      transparent: true,
+      maskMode: "luminance",
+      maskLow: 0,
+      maskHigh: 180,
+      maskBackdrop,
+      bgColor: "#ff5010",
+      cellSize: 40,
+    };
+    const expected = createCanvas(192, 108),
+      actual = createCanvas(192, 108);
+    new FrameRenderer().render(input, expected, c, 192, 108);
+    const ctx = expected.getContext("2d");
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.fillStyle = c.bgColor;
+    ctx.fillRect(0, 0, 192, 108);
+    new FrameRenderer().render(input, actual, c, 192, 108, null, 0, true);
+    expect(actual.getContext("2d").getImageData(0, 0, 192, 108).data).toEqual(
+      ctx.getImageData(0, 0, 192, 108).data,
+    );
+    expect(
+      actual
+        .getContext("2d")
+        .getImageData(0, 0, 192, 108)
+        .data.every((v, i) => i % 4 !== 3 || v === 255),
+    ).toBe(true);
+  },
+);
+
+test("camera motion trails advance after the first frame", async () => {
+  const { renderClock } = await import("./workflow");
+  const input = createCanvas(16, 16),
+    output = createCanvas(16, 16),
+    ctx = input.getContext("2d"),
+    renderer = new FrameRenderer();
+  const config = { ...defaults, effect: "pixel", smooth: 0.5 };
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, 16, 16);
+  renderer.render(
+    input,
+    output,
+    config,
+    16,
+    16,
+    null,
+    renderClock("camera", 0, 1000),
+  );
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 16, 16);
+  renderer.render(
+    input,
+    output,
+    config,
+    16,
+    16,
+    null,
+    renderClock("camera", 0, 1000 + 1000 / 30),
+  );
+  const value = output.getContext("2d").getImageData(8, 8, 1, 1).data[0];
+  expect(value).toBeGreaterThan(100);
+  expect(value).toBeLessThan(155);
 });

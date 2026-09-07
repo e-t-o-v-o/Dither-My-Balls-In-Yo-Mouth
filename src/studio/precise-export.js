@@ -145,9 +145,12 @@ export async function exportPrecise({
             renderer.render(
               sample,
               canvas,
-              { ...config, transparent: false },
+              config,
               width,
               height,
+              null,
+              sample.timestamp,
+              true,
             );
             frames++;
             return canvas;
@@ -187,11 +190,12 @@ export async function exportPrecise({
         renderer.render(
           drawSignal(signalCanvas, start + frame / fps),
           canvas,
-          { ...config, transparent: false },
+          config,
           width,
           height,
           null,
           start + frame / fps,
+          true,
         );
         await video.add(frame / fps, Math.min(1 / fps, duration - frame / fps));
         frames++;
