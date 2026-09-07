@@ -21,10 +21,12 @@ test("only supported formats are offered", () => {
   expect(recordingFormats(null)).toEqual([]);
 });
 test("MP4 prefers H.264/AAC when supported and falls back to the native encoder", () => {
-  expect(recordingFormats({ isTypeSupported: () => true })[0].mime)
-    .toBe("video/mp4;codecs=avc1,mp4a.40.2");
-  expect(recordingFormats({ isTypeSupported: (mime) => mime === "video/mp4" }))
-    .toEqual([{ id: "mp4", mime: "video/mp4", label: "MP4" }]);
+  expect(recordingFormats({ isTypeSupported: () => true })[0].mime).toBe(
+    "video/mp4;codecs=avc1,mp4a.40.2",
+  );
+  expect(
+    recordingFormats({ isTypeSupported: (mime) => mime === "video/mp4" }),
+  ).toEqual([{ id: "mp4", mime: "video/mp4", label: "MP4" }]);
 });
 test("the extension follows the actual container, never a requested label", () => {
   expect(mimeExtension("video/webm;codecs=vp8")).toBe("webm");
@@ -115,4 +117,13 @@ describe("recorder lifecycle", () => {
     expect(element.pause).not.toHaveBeenCalled();
     expect(stopTrack).toHaveBeenCalled();
   });
+});
+test("GIF fractional frame periods do not shorten the selection", async () => {
+  const { gifFrameDelay } = await import("./export");
+  for (const fps of [10, 12, 15]) {
+    const total = Array.from({ length: fps * 2 }, (_, frame) =>
+      gifFrameDelay(frame, fps, 2),
+    ).reduce((a, b) => a + b, 0);
+    expect(total).toBe(2000);
+  }
 });

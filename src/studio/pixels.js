@@ -70,6 +70,15 @@ export function nearest(r, g, b, palette) {
   return best;
 }
 export function adjust(data, c) {
+  if (
+    !c.removeGreen &&
+    c.effect !== "green-screen" &&
+    c.saturation === 1 &&
+    c.contrast === 1 &&
+    c.brightness === 0 &&
+    !c.invert
+  )
+    return data;
   const out = new Uint8ClampedArray(data);
   for (let i = 0; i < out.length; i += 4) {
     let r = data[i],
@@ -95,25 +104,25 @@ export function adjust(data, c) {
 }
 export function dither(data, w, h, palette, method = "ordered", amount = 1) {
   const out = new Uint8ClampedArray(data),
-    errors = new Float32Array(w * h * 3);
+    errors = method === "ordered" ? null : new Float32Array(w * 3 * 3);
   const matrix = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
   const kernel = kernels[method] || kernels.floyd;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4,
-        e = (y * w + x) * 3;
-      if (!out[i + 3]) continue;
+        e = ((y % 3) * w + x) * 3;
+      if (!out[i + 3]) {
+        if (errors) errors[e] = errors[e + 1] = errors[e + 2] = 0;
+        continue;
+      }
       const offset =
         method === "ordered"
-          ? ((matrix[(y % 4) * 4 + (x % 4)] + 0.5) / 16 - 0.5) * 128 * amount
+          ? ((matrix[(y % 4) * 4 + (x % 4)] + 0.5) / 16 - 0.5) * 256 * amount
           : 0;
-      const r = clamp(data[i] + (method === "ordered" ? offset : errors[e]));
-      const g = clamp(
-        data[i + 1] + (method === "ordered" ? offset : errors[e + 1]),
-      );
-      const b = clamp(
-        data[i + 2] + (method === "ordered" ? offset : errors[e + 2]),
-      );
+      const r = data[i] + (method === "ordered" ? offset : errors[e]);
+      const g = data[i + 1] + (method === "ordered" ? offset : errors[e + 1]);
+      const b = data[i + 2] + (method === "ordered" ? offset : errors[e + 2]);
+      if (errors) errors[e] = errors[e + 1] = errors[e + 2] = 0;
       const p = palette[nearest(r, g, b, palette)];
       out[i] = p[0];
       out[i + 1] = p[1];
@@ -124,7 +133,7 @@ export function dither(data, w, h, palette, method = "ordered", amount = 1) {
             yy = y + dy;
           if (xx < 0 || xx >= w || yy >= h || !data[(yy * w + xx) * 4 + 3])
             continue;
-          const ei = (yy * w + xx) * 3;
+          const ei = ((yy % 3) * w + xx) * 3;
           errors[ei] += (r - p[0]) * f * amount;
           errors[ei + 1] += (g - p[1]) * f * amount;
           errors[ei + 2] += (b - p[2]) * f * amount;

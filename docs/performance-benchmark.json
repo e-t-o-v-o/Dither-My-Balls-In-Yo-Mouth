@@ -1,0 +1,55 @@
+{
+  "runtime": "Node + Skia Canvas; warmed median of 12 frames; excludes video decode and encode",
+  "cellSize": 8,
+  "baseline": "ebdbb2c",
+  "results": [
+    {
+      "case": "Bayer preview",
+      "beforeMs": 65,
+      "afterMs": 1.89,
+      "speedup": 34.3
+    },
+    {
+      "case": "Bayer 1080p",
+      "beforeMs": 59.12,
+      "afterMs": 1.29,
+      "speedup": 45.68
+    },
+    {
+      "case": "Bayer 4K",
+      "beforeMs": 67.98,
+      "afterMs": 3.23,
+      "speedup": 21.06
+    },
+    {
+      "case": "Floyd 1080p",
+      "beforeMs": 61.66,
+      "afterMs": 5.29,
+      "speedup": 11.66
+    },
+    {
+      "case": "ASCII 1080p",
+      "beforeMs": 175.33,
+      "afterMs": 33.78,
+      "speedup": 5.19
+    },
+    {
+      "case": "Edges 1080p",
+      "beforeMs": 53.25,
+      "afterMs": 6.7,
+      "speedup": 7.95
+    },
+    {
+      "case": "Halftone 1080p",
+      "beforeMs": null,
+      "afterMs": 44.4,
+      "speedup": null
+    },
+    {
+      "case": "Crosshatch 1080p",
+      "beforeMs": null,
+      "afterMs": 28.34,
+      "speedup": null
+    }
+  ]
+}

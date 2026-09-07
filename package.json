@@ -1,12 +1,13 @@
 {
   "name": "dither-studio",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "dependencies": {
+    "fix-webm-duration": "^1.0.6",
     "gif.js": "^0.2.0",
+    "mediabunny": "^1.55.7",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "fix-webm-duration": "^1.0.6"
+    "react-dom": "^19.1.0"
   },
   "scripts": {
     "start": "vite --host 0.0.0.0",
@@ -17,16 +18,20 @@
     "test:ci": "vitest run",
     "preview": "vite preview --host 0.0.0.0",
     "dev": "vite",
-    "predev": "node scripts/copy-export-assets.cjs"
+    "predev": "node scripts/copy-export-assets.cjs",
+    "benchmark": "node scripts/benchmark-renderer.mjs",
+    "test:exports": "node scripts/check-precise-export.mjs"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "^1.0.8",
+    "@napi-rs/webcodecs": "^1.4.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
-    "vite": "^8.2.2",
     "@vitejs/plugin-react": "^6.1.1",
-    "vitest": "^5.0.0",
-    "jsdom": "^30.0.1"
+    "jsdom": "^30.0.1",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
   },
   "engines": {
     "node": ">=22.12.0"

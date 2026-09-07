@@ -20,6 +20,7 @@ import {
   timeLabel,
   filename,
 } from "./studio/model";
+import { exportPrecise, hasPreciseExport } from "./studio/precise-export";
 import { FrameRenderer, drawSignal } from "./studio/renderer";
 import {
   loadFile,
@@ -62,7 +63,20 @@ function historyReducer(state, a) {
     };
   }
   const present = sanitizeConfig(
-    a.config || { ...state.present, [a.key]: a.value },
+    a.config ||
+      (a.type === "effect"
+        ? {
+            ...state.present,
+            effect: a.value,
+            overlay: "none",
+            ...(["ascii", "dither-ascii", "halftone"].includes(a.value)
+              ? { cellSize: Math.max(14, state.present.cellSize) }
+              : {}),
+            ...(a.value === "crosshatch"
+              ? { fgColor: "#101215", bgColor: "#f1f2e9" }
+              : {}),
+          }
+        : { ...state.present, [a.key]: a.value }),
   );
   const grouped = a.key && state.group === a.key && Date.now() - state.at < 500;
   return {
@@ -152,6 +166,15 @@ function App() {
       initialHistory,
     ),
     config = history.present;
+  const paletteEffect =
+    ["dither", "dither-ascii", "palette"].includes(config.effect) ||
+    (config.effect === "ascii" && config.textColor === "palette");
+  const colorSummary = paletteEffect
+    ? `${palettes[config.palette].length} palette colors`
+    : ["pixel", "channel"].includes(config.effect) ||
+        (config.effect === "ascii" && config.textColor === "source")
+      ? "Source color"
+      : "Custom ink";
   const [source, setSource] = useState(demo),
     sourceRef = useRef(source);
   const [playing, setPlaying] = useState(false),
@@ -173,6 +196,8 @@ function App() {
     [resolution, setResolution] = useState("1920"),
     [fps, setFps] = useState(30),
     [includeAudio, setIncludeAudio] = useState(true),
+    [engine, setEngine] = useState(hasPreciseExport() ? "precise" : "live"),
+    [quality, setQuality] = useState("high"),
     [muted, setMuted] = useState(true),
     [loop, setLoop] = useState(true);
   const [presetName, setPresetName] = useState(""),
@@ -197,8 +222,19 @@ function App() {
     resultURL = useRef(),
     mounted = useRef(true),
     facing = useRef("user");
-  const formats = recordingFormats();
-  const set = useCallback((key, value) => dispatch({ key, value }), []);
+  const liveFormats = recordingFormats();
+  const usePrecise = engine === "precise" && source.kind !== "camera";
+  const formats =
+    usePrecise && hasPreciseExport()
+      ? [
+          { id: "mp4", label: "MP4" },
+          { id: "webm", label: "WEBM" },
+        ]
+      : liveFormats;
+  const set = useCallback((key, value) => {
+    if (key === "effect") dispatch({ type: "effect", value });
+    else dispatch({ key, value });
+  }, []);
   sourceRef.current = source;
   trimRef.current = trim;
   useEffect(() => {
@@ -206,7 +242,11 @@ function App() {
     writeStorage("dither.theme.v2", theme);
   }, [theme]);
   useEffect(() => {
-    writeStorage("dither.config.v2", config);
+    const timer = setTimeout(
+      () => writeStorage("dither.config.v2", config),
+      250,
+    );
+    return () => clearTimeout(timer);
   }, [config]);
   useEffect(() => {
     const loadedFonts = fontFaces.current;
@@ -236,9 +276,11 @@ function App() {
   };
   useEffect(() => {
     if (!rendererRef.current || busy) return;
+    rendererRef.current.invalidate();
     let raf = 0,
       last = -Infinity,
       lastUI = 0,
+      lastDecodedTime = -Infinity,
       count = 0,
       fpsStart = performance.now(),
       startClock = performance.now(),
@@ -267,7 +309,12 @@ function App() {
           }
         }
         timeRef.current = t;
-        if (now - last >= 1000 / 30 || !playing) {
+        if (
+          (now - last >= 1000 / 30 - 0.5 ||
+            (!playing && source.kind !== "camera")) &&
+          (source.kind !== "video" || t !== lastDecodedTime)
+        ) {
+          lastDecodedTime = t;
           const frame =
             source.kind === "demo"
               ? drawSignal(signalRef.current, t)
@@ -283,6 +330,8 @@ function App() {
               config,
               size.width,
               size.height,
+              null,
+              t,
             );
             const original = originalRef.current;
             if (original) {
@@ -297,7 +346,7 @@ function App() {
           }
           last = now;
         }
-        if (now - lastUI > 100) {
+        if (now - lastUI > 250) {
           setTime(t);
           lastUI = now;
         }
@@ -632,7 +681,7 @@ function App() {
       let audioStream;
       const still = ["png", "svg"].includes(format);
       const video = !still && format !== "gif";
-      if (video && includeAudio && s.kind === "video")
+      if (video && !usePrecise && includeAudio && s.kind === "video")
         audioStream = await audioRef.current.connect(s.element, !muted);
       if (navigator.wakeLock)
         try {
@@ -669,12 +718,15 @@ function App() {
           throw new Error(
             "This browser does not support video recording. PNG, SVG, and GIF are still available.",
           );
-        output = await recordVideo({
-          ...options,
-          config: { ...c, transparent: false },
-          audioStream,
-          format: choice,
-        });
+        if (usePrecise)
+          output = await exportPrecise({ ...options, includeAudio, quality });
+        else
+          output = await recordVideo({
+            ...options,
+            config: { ...c, transparent: false },
+            audioStream,
+            format: choice,
+          });
       }
       if (controller.signal.aborted) return;
       if (resultURL.current) URL.revokeObjectURL(resultURL.current);
@@ -1241,7 +1293,7 @@ function App() {
             <span className="mono">
               {effects.find(([id]) => id === config.effect)?.[1]}
             </span>
-            <span>{palettes[config.palette].length} colors</span>
+            <span>{colorSummary}</span>
           </div>
         </aside>
       </main>
@@ -1305,10 +1357,11 @@ function App() {
             </ol>
             <h3>Export notes</h3>
             <p>
-              MP4 and WebM appear when your browser supports their encoders.
-              Video exports run in real time: keep this tab visible and your
-              device awake. For very detailed effects, reduce resolution if
-              recording cannot keep up.
+              Frame-by-frame export saves every frame at 24, 30, or 60 fps when
+              supported. Auto chooses a compatible video and audio format. High
+              quality balances detail and size; Maximum gives dense textures
+              more bitrate. Live recording is available for cameras and browser
+              compatibility; keep the tab visible during recording.
             </p>
             <p>
               Source audio can be included in video files. Camera recording is
@@ -1346,7 +1399,7 @@ function App() {
               <strong>{source.name}</strong>
               <span>
                 {effects.find(([id]) => id === config.effect)?.[1]} /{" "}
-                {config.palette}
+                {paletteEffect ? config.palette : colorSummary}
               </span>
             </div>
             <fieldset className="control-fieldset" disabled={busy}>
@@ -1409,12 +1462,46 @@ function App() {
                     value={fps}
                     onChange={(v) => setFps(Number(v))}
                   >
-                    {(format === "gif" ? [10, 12, 15] : [24, 30]).map((n) => (
+                    {(format === "gif"
+                      ? [10, 12, 15]
+                      : usePrecise
+                        ? [24, 30, 60]
+                        : [24, 30]
+                    ).map((n) => (
                       <option key={n} value={n}>
                         {n} fps
                       </option>
                     ))}
                   </Select>
+                  {format !== "gif" && source.kind !== "camera" && (
+                    <Select
+                      label="Export mode"
+                      value={engine}
+                      onChange={(v) => {
+                        setEngine(v);
+                        if (v === "live" && fps > 30) setFps(30);
+                      }}
+                    >
+                      {hasPreciseExport() && (
+                        <option value="precise">
+                          Frame by frame · best quality
+                        </option>
+                      )}
+                      <option value="live">
+                        Live recording · compatibility
+                      </option>
+                    </Select>
+                  )}
+                  {format !== "gif" && usePrecise && (
+                    <Select
+                      label="Encoding quality"
+                      value={quality}
+                      onChange={setQuality}
+                    >
+                      <option value="high">High · balanced file size</option>
+                      <option value="maximum">Maximum · crisp texture</option>
+                    </Select>
+                  )}
                   {format !== "gif" && source.kind === "video" && (
                     <Check
                       label="Include source audio"
@@ -1430,7 +1517,9 @@ function App() {
                 </span>
                 <span>
                   {format === "auto"
-                    ? formats[0]?.label || "Video encoder unavailable"
+                    ? usePrecise
+                      ? "Auto codec"
+                      : formats[0]?.label || "Video encoder unavailable"
                     : format.toUpperCase()}
                 </span>
               </div>
@@ -1439,8 +1528,18 @@ function App() {
                   ? "Loops forever. Silent. Maximum 30 seconds; larger frames need a shorter selection."
                   : ["png", "svg"].includes(format)
                     ? "Exports the current frame. Transparent backgrounds are preserved."
-                    : "Records in real time. Keep this tab visible. Videos use your background color and preserve the source aspect ratio."}
+                    : usePrecise
+                      ? "Renders every frame at the selected rate, independent of playback speed. Audio and video share the same trim. Videos use your background color."
+                      : hasPreciseExport()
+                        ? "Records in real time. Keep this tab visible. Slow rendering can drop frames; choose Frame by frame for reliable motion."
+                        : "This browser supports live recording only. Keep this tab visible. Frame rate depends on playback and device speed."}
               </p>
+              {exportDimensions.width > source.width && (
+                <p className="hint">
+                  Source detail: {source.width} × {source.height}. Larger
+                  exports redraw the effect geometry at the selected size.
+                </p>
+              )}
               <button
                 className="primary full export-button"
                 onClick={startExport}
@@ -1485,6 +1584,12 @@ function App() {
                   {result.width} × {result.height} ·{" "}
                   {(result.blob.size / 1024 / 1024).toFixed(2)} MB
                 </span>
+                {result.engine === "precise" && (
+                  <p className="hint">
+                    {result.targetFps} fps · {result.codec.toUpperCase()} ·
+                    frame-by-frame export
+                  </p>
+                )}
                 {result.actualFps < result.targetFps * 0.85 && (
                   <p className="inline-error">
                     This device rendered about {Math.round(result.actualFps)}{" "}

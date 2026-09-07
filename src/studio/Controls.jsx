@@ -63,6 +63,9 @@ export function Range({
         max={max}
         step={step}
         value={value}
+        style={{
+          "--range-progress": `${((value - min) / (max - min)) * 100}%`,
+        }}
         onChange={(e) => onChange(Number(e.target.value))}
         disabled={disabled}
       />
@@ -102,15 +105,8 @@ export function Check({ label, value, onChange, description }) {
 }
 export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
   const text =
-    [
-      "ascii",
-      "dither-ascii",
-      "binary",
-      "decade",
-      "binary-char",
-      "letter-char",
-      "letters-palette",
-    ].includes(c.effect) || c.overlay !== "none";
+    ["ascii", "dither-ascii"].includes(c.effect) ||
+    (["palette", "two-tone"].includes(c.effect) && c.overlay !== "none");
   return (
     <>
       <section className="inspector-section">
@@ -119,25 +115,42 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           <span>01</span>
         </div>
         <div className="effect-grid">
-          {effects.map(([id, name, n]) => (
+          {effects.map(([id, name, n, description]) => (
             <button
               key={id}
               aria-label={name}
+              title={description}
               className={c.effect === id ? "effect selected" : "effect"}
               aria-pressed={c.effect === id}
               onClick={() => set("effect", id)}
             >
-              <span>{n}</span>
-              {name}
+              <span className={`effect-art art-${id}`} aria-hidden="true">
+                {id.includes("ascii") ? "Aa" : id === "channel" ? "RGB" : ""}
+              </span>
+              <span className="effect-name">{name}</span>
             </button>
           ))}
         </div>
+        <p className="effect-description">
+          {effects.find(([id]) => id === c.effect)?.[3]}
+        </p>
       </section>
       <section className="inspector-section">
         <div className="section-heading">
           <h2>Texture</h2>
           <span>02</span>
         </div>
+        {["dither", "dither-ascii", "ascii", "palette"].includes(c.effect) && (
+          <Select
+            label="Effect palette"
+            value={c.palette}
+            onChange={(v) => set("palette", v)}
+          >
+            {Object.keys(palettes).map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </Select>
+        )}
         {c.effect.includes("dither") && (
           <>
             <Select
@@ -172,9 +185,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           Smaller cells preserve more detail. The pattern scales with your
           export.
         </p>
-        {["two-tone", "binary", "binary-char", "letter-char", "edge"].includes(
-          c.effect,
-        ) && (
+        {["two-tone", "edge"].includes(c.effect) && (
           <Range
             label="Threshold"
             value={c.threshold}
@@ -183,35 +194,54 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
             onChange={(v) => set("threshold", v)}
           />
         )}
-        {c.effect === "palette" && (
+        {["palette", "two-tone"].includes(c.effect) && (
           <Select
             label="Cell overlay"
             value={c.overlay}
             onChange={(v) => set("overlay", v)}
           >
             <option value="none">None</option>
-            <option value="number">Palette number</option>
+            {c.effect === "palette" ? (
+              <option value="number">Palette number</option>
+            ) : (
+              <>
+                <option value="binary">Binary · 0 / 1</option>
+                <option value="luma">Brightness · 0–9</option>
+              </>
+            )}
             <option value="character">Custom character</option>
           </Select>
         )}
-        {(c.effect === "letter-char" || c.overlay === "character") && (
-          <label className="control">
-            Character
-            <input
-              type="text"
-              value={c.char}
-              maxLength={4}
-              onChange={(e) => set("char", e.target.value)}
-            />
-          </label>
-        )}
-        {c.effect === "letters-palette" && (
+        {["palette", "two-tone"].includes(c.effect) &&
+          c.overlay === "character" && (
+            <label className="control">
+              Character
+              <input
+                type="text"
+                value={c.char}
+                maxLength={4}
+                onChange={(e) => set("char", e.target.value)}
+              />
+            </label>
+          )}
+        {c.effect === "halftone" && (
           <Range
-            label="Letter count"
-            value={c.letterCount}
-            min={2}
-            max={26}
-            onChange={(v) => set("letterCount", v)}
+            label="Dot scale"
+            value={c.dotScale}
+            min={0.25}
+            max={1}
+            step={0.05}
+            onChange={(v) => set("dotScale", v)}
+          />
+        )}
+        {c.effect === "crosshatch" && (
+          <Range
+            label="Stroke weight"
+            value={c.lineWidth}
+            min={0.04}
+            max={0.3}
+            step={0.01}
+            onChange={(v) => set("lineWidth", v)}
           />
         )}
       </section>
@@ -282,7 +312,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
             step={0.05}
             onChange={(v) => set("fontScale", v)}
           />
-          {["ascii", "dither-ascii", "letters-palette"].includes(c.effect) && (
+          {["ascii", "dither-ascii"].includes(c.effect) && (
             <Select
               label="Text color"
               value={c.textColor}
@@ -301,52 +331,58 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
 export function ColorControls({ config: c, set }) {
   return (
     <>
-      <section className="inspector-section">
-        <div className="section-heading">
-          <h2>Color palette</h2>
-          <span>{palettes[c.palette].length} colors</span>
-        </div>
-        <div className="large-swatches">
-          {palettes[c.palette].map((col, i) => (
-            <span key={`${col}-${i}`} style={{ background: col }} title={col} />
-          ))}
-        </div>
-        <Select
-          label="Palette"
-          value={c.palette}
-          onChange={(v) => set("palette", v)}
-        >
-          {Object.keys(palettes).map((p) => (
-            <option key={p}>{p}</option>
-          ))}
-        </Select>
-        <div className="palette-grid">
-          {[
-            "Paper",
-            "Phosphor",
-            "Amber",
-            "Electric",
-            "Vaporwave Aurora",
-            "Brutalist Neon Clash",
-          ].map((p) => (
-            <button
-              key={p}
-              className={
-                c.palette === p ? "palette-option selected" : "palette-option"
-              }
-              onClick={() => set("palette", p)}
-              aria-pressed={c.palette === p}
-            >
-              <span className="swatches">
-                {palettes[p].map((col, i) => (
-                  <i key={i} style={{ background: col }} />
-                ))}
-              </span>
-              <span>{p}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+      {["dither", "dither-ascii", "ascii", "palette"].includes(c.effect) && (
+        <section className="inspector-section">
+          <div className="section-heading">
+            <h2>Color palette</h2>
+            <span>{palettes[c.palette].length} colors</span>
+          </div>
+          <div className="large-swatches">
+            {palettes[c.palette].map((col, i) => (
+              <span
+                key={`${col}-${i}`}
+                style={{ background: col }}
+                title={col}
+              />
+            ))}
+          </div>
+          <Select
+            label="Palette"
+            value={c.palette}
+            onChange={(v) => set("palette", v)}
+          >
+            {Object.keys(palettes).map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </Select>
+          <div className="palette-grid">
+            {[
+              "Paper",
+              "Phosphor",
+              "Amber",
+              "Electric",
+              "Vaporwave Aurora",
+              "Brutalist Neon Clash",
+            ].map((p) => (
+              <button
+                key={p}
+                className={
+                  c.palette === p ? "palette-option selected" : "palette-option"
+                }
+                onClick={() => set("palette", p)}
+                aria-pressed={c.palette === p}
+              >
+                <span className="swatches">
+                  {palettes[p].map((col, i) => (
+                    <i key={i} style={{ background: col }} />
+                  ))}
+                </span>
+                <span>{p}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="inspector-section">
         <div className="section-heading">
           <h2>Adjustments</h2>
@@ -409,11 +445,12 @@ export function ColorControls({ config: c, set }) {
         </div>
         <Range
           label="Frame response"
-          value={c.smooth}
-          min={0.05}
-          max={1}
-          step={0.05}
-          onChange={(v) => set("smooth", v)}
+          value={c.smooth * 100}
+          min={5}
+          max={100}
+          step={5}
+          unit="%"
+          onChange={(v) => set("smooth", v / 100)}
         />
         <p className="hint">
           100% follows each frame. Lower values leave a soft motion trail.

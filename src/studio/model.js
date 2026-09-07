@@ -9,19 +9,51 @@ export const palettes = {
   ...paletteSets,
 };
 export const effects = [
-  ["dither", "Dither", "01"],
-  ["ascii", "ASCII", "02"],
-  ["dither-ascii", "Dither + ASCII", "03"],
-  ["palette", "Palette", "04"],
-  ["two-tone", "Two tone", "05"],
-  ["binary", "Binary", "06"],
-  ["decade", "Color index", "07"],
-  ["binary-char", "Number blocks", "08"],
-  ["letter-char", "Character blocks", "09"],
-  ["letters-palette", "Letter palette", "10"],
-  ["edge", "Edges", "11"],
-  ["green-screen", "Green screen", "12"],
-  ["channel", "RGB channels", "13"],
+  ["dither", "Dither", "01", "Six ordered and error-diffusion patterns."],
+  ["ascii", "ASCII", "02", "Brightness mapped to a custom character ramp."],
+  [
+    "dither-ascii",
+    "Dither + ASCII",
+    "03",
+    "Quantized brightness with typographic texture.",
+  ],
+  [
+    "palette",
+    "Palette",
+    "04",
+    "Nearest-color reduction with optional cell labels.",
+  ],
+  [
+    "two-tone",
+    "Threshold",
+    "05",
+    "A clean two-color cutoff with optional glyphs.",
+  ],
+  [
+    "halftone",
+    "Halftone",
+    "06",
+    "Area-correct dots that reproduce the source tone.",
+  ],
+  [
+    "crosshatch",
+    "Crosshatch",
+    "07",
+    "Layered ink strokes for light, midtone, and shadow.",
+  ],
+  ["edge", "Edges", "08", "Sobel contours with adjustable sensitivity."],
+  [
+    "channel",
+    "Channel study",
+    "09",
+    "Red, green, and blue as three grayscale panels.",
+  ],
+  [
+    "pixel",
+    "Pixelate",
+    "10",
+    "Source-color mosaic, also useful for chroma keying.",
+  ],
 ];
 export const methods = [
   ["ordered", "Bayer ordered"],
@@ -57,6 +89,8 @@ export const defaults = {
   char: "×",
   letterCount: 10,
   smooth: 1,
+  dotScale: 1,
+  lineWidth: 0.12,
 };
 const numeric = {
   cellSize: [2, 80],
@@ -69,6 +103,8 @@ const numeric = {
   fontScale: [0.4, 2],
   letterCount: [2, 26],
   smooth: [0.05, 1],
+  dotScale: [0.25, 1],
+  lineWidth: [0.04, 0.3],
 };
 export function sanitizeConfig(input = {}) {
   const c = { ...defaults };
@@ -83,6 +119,22 @@ export function sanitizeConfig(input = {}) {
     else if (typeof c[k] === "string" && typeof v === "string")
       c[k] = v.slice(0, 128);
   }
+  // Consolidate old effect IDs without losing saved looks.
+  const legacy = {
+    decade: { effect: "palette", overlay: "number" },
+    binary: { effect: "two-tone", overlay: "binary" },
+    "binary-char": { effect: "two-tone", overlay: "luma" },
+    "letter-char": { effect: "two-tone", overlay: "character" },
+    "letters-palette": {
+      effect: "ascii",
+      characters: "ABCDEFGHIJKLMNOPQRSTUVWXYZ".slice(
+        0,
+        Math.round(c.letterCount),
+      ),
+    },
+    "green-screen": { effect: "pixel", removeGreen: true },
+  };
+  if (Object.hasOwn(legacy, c.effect)) Object.assign(c, legacy[c.effect]);
   if (!effects.some(([id]) => id === c.effect)) c.effect = defaults.effect;
   if (!methods.some(([id]) => id === c.method)) c.method = defaults.method;
   if (!Object.hasOwn(palettes, c.palette)) c.palette = defaults.palette;
@@ -90,7 +142,8 @@ export function sanitizeConfig(input = {}) {
     if (!/^#[\da-f]{6}$/i.test(c[k])) c[k] = defaults[k];
   if (!["palette", "source", "foreground"].includes(c.textColor))
     c.textColor = "palette";
-  if (!["none", "number", "character"].includes(c.overlay)) c.overlay = "none";
+  if (!["none", "number", "character", "binary", "luma"].includes(c.overlay))
+    c.overlay = "none";
   c.char = Array.from(c.char || "×")[0];
   c.characters = c.characters || defaults.characters;
   c.font = c.font.replace(/[^\w\s-]/g, "") || "monospace";
