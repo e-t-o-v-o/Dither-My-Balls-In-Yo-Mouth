@@ -1,6 +1,6 @@
 # Dither — by etovo
 
-A local video, image, and webcam effects studio. The v2.1 studio rebuilds the original camera-effects prototype around video editing and export, with a desktop workspace and a touch layout for iPad.
+A local video, image, and webcam effects studio. The v2.2 studio rebuilds the original camera-effects prototype around video editing and export, with a desktop workspace and a touch layout for iPad.
 
 ## Use the studio
 
@@ -14,7 +14,8 @@ The app never uploads your media. Settings and named presets are stored locally,
 ## What is included
 
 - Six distinct color-aware dithering methods: Bayer, Floyd–Steinberg, Atkinson, Jarvis–Judice–Ninke, Burkes, and Sierra.
-- Ten focused effects: Dither, ASCII, Dither + ASCII, Palette, Threshold, Halftone, Crosshatch, Edges, Channel study, and Pixelate. Binary, number, and character treatments are overlays; letter palettes are ASCII ramps. Existing presets migrate automatically.
+- Thirteen focused effects: Contour beads, Dot mosaic, Symbol field, Dither, ASCII, Dither + ASCII, Palette, Threshold, Halftone, Crosshatch, Edges, Channel study, and Pixelate. Binary, number, and character treatments are overlays; letter palettes are ASCII ramps. Existing presets migrate automatically. Graphic and Digital families keep the picker compact.
+- Twelve style starters with real rendered previews, three new palettes, palette-backed letterpress type, and reusable brightness/color masks. Masks can isolate a selection or keep the original image behind it; they do not perform automatic subject detection.
 - Original palette and character-set collections, plus four concise default palettes and six starting looks.
 - Brightness, contrast, saturation, inversion, transparency, chroma keying, and temporal smoothing.
 - Video playback, scrubbing, looping, trim controls, audio monitoring, and undo/redo of effect settings.
@@ -80,3 +81,5 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 See [the performance and quality review](docs/PERFORMANCE.md) for measured gains and validation limits.
 
 See [the complete audit](docs/AUDIT.md) for the original defects, corresponding repairs, test evidence, and verification limits.
+
+See [Graphic styles review](docs/GRAPHIC-STYLES.md) for the v2.2 reference-inspired styles, rendering measurements, and validation. Regenerate style thumbnails with `npm run previews` after changing a bundled look.

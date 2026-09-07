@@ -1,5 +1,7 @@
 import { palettes } from "./model";
 import { adjust, dither, edge, rgb, luma, nearest } from "./pixels";
+import { applyMask } from "./masks";
+import { GraphicRenderer } from "./graphics";
 const makeCanvas = () => document.createElement("canvas");
 function resize(c, w, h) {
   if (c.width !== w) c.width = w;
@@ -56,6 +58,8 @@ export class FrameRenderer {
     this.layer = makeCanvas();
     this.glyphs = new Map();
     this.textLayer = makeCanvas();
+    this.graphic = new GraphicRenderer();
+    this.backdrop = makeCanvas();
     this.reset = true;
   }
   invalidate() {
@@ -73,7 +77,12 @@ export class FrameRenderer {
   ) {
     resize(canvas, width, height);
     const ctx = overrideContext || canvas.getContext("2d");
-    const cell = Math.max(1, (c.cellSize * Math.max(width, height)) / 1920);
+    const cell = Math.max(
+      1,
+      ((c.effect === "beads" ? Math.max(6, c.cellSize) : c.cellSize) *
+        Math.max(width, height)) /
+        1920,
+    );
     const w = Math.max(1, Math.ceil(width / cell));
     const h = Math.max(1, Math.ceil(height / cell));
     const cw = width / w,
@@ -104,7 +113,7 @@ export class FrameRenderer {
     }
     this.lastTime = time;
     this.reset = false;
-    let data = adjust(sc.getImageData(0, 0, w, h).data, c);
+    let data = adjust(applyMask(sc.getImageData(0, 0, w, h).data, c), c);
     const original = data,
       palHex = palettes[c.palette];
     if (this.palette !== c.palette) {
@@ -120,6 +129,29 @@ export class FrameRenderer {
     if (!c.transparent) {
       ctx.fillStyle = c.bgColor;
       ctx.fillRect(0, 0, width, height);
+    }
+    if (c.maskMode !== "none" && c.maskBackdrop) {
+      resize(this.backdrop, width, height);
+      const bc = this.backdrop.getContext("2d");
+      bc.clearRect(0, 0, width, height);
+      if (typeof source.draw === "function")
+        source.draw(bc, 0, 0, width, height);
+      else bc.drawImage(source, 0, 0, width, height);
+      ctx.drawImage(this.backdrop, 0, 0, width, height);
+    }
+    if (["beads", "mosaic", "symbols"].includes(c.effect)) {
+      this.graphic.render(
+        ctx,
+        data,
+        w,
+        h,
+        c,
+        width,
+        height,
+        pal,
+        !!overrideContext,
+      );
+      return canvas;
     }
     const fg = rgb(c.fgColor),
       bg = rgb(c.bgColor);
@@ -276,9 +308,21 @@ export class FrameRenderer {
     }
     if (c.underlay && ["ascii", "dither-ascii"].includes(c.effect)) {
       resize(this.layer, w, h);
+      const underlay =
+        c.underlayMode === "palette"
+          ? new Uint8ClampedArray(original)
+          : original;
+      if (c.underlayMode === "palette")
+        for (let i = 0; i < underlay.length; i += 4) {
+          const color =
+            pal[nearest(original[i], original[i + 1], original[i + 2], pal)];
+          underlay[i] = color[0];
+          underlay[i + 1] = color[1];
+          underlay[i + 2] = color[2];
+        }
       this.layer
         .getContext("2d")
-        .putImageData(new ImageData(original, w, h), 0, 0);
+        .putImageData(new ImageData(underlay, w, h), 0, 0);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(this.layer, 0, 0, width, height);
     }
@@ -403,9 +447,17 @@ export class FrameRenderer {
         const textColor =
           c.textColor === "source"
             ? `rgb(${original[i]},${original[i + 1]},${original[i + 2]})`
-            : c.textColor === "foreground"
-              ? c.fgColor
-              : palHex[pi];
+            : c.textColor === "contrast"
+              ? luma(
+                  ...(c.underlayMode === "palette"
+                    ? pal[pi]
+                    : [original[i], original[i + 1], original[i + 2]]),
+                ) > 128
+                ? "#101215"
+                : "#f1f2e9"
+              : c.textColor === "foreground"
+                ? c.fgColor
+                : palHex[pi];
         const contrast = luma(...pal[pi]) > 128 ? "#101215" : "#f1f2e9";
         switch (c.effect) {
           case "ascii":
@@ -545,38 +597,28 @@ export class SVGContext {
   }
   drawImage(source, x, y, w, h) {
     this.parts.push(
-      `<image x="${x}" y="${y}" width="${w}" height="${h}" href="${source.toDataURL("image/png")}"/>`,
+      `<image x="${x}" y="${y}" width="${w}" height="${h}" xlink:href="${source.toDataURL("image/png")}"/>`,
     );
   }
   beginPath() {
     this.path = [];
-    this.circle = null;
-    this.box = null;
   }
   rect(x, y, w, h) {
-    this.box = { x, y, w, h };
+    this.path.push(`M${x} ${y}h${w}v${h}h${-w}Z`);
   }
   arc(x, y, r) {
-    this.circle = { x, y, r };
+    this.path.push(
+      `M${x + r} ${y}a${r} ${r} 0 1 0 ${-2 * r} 0a${r} ${r} 0 1 0 ${2 * r} 0Z`,
+    );
   }
-  fill() {
-    if (this.box) {
-      const { x, y, w, h } = this.box;
-      const outer = `M${x} ${y}h${w}v${h}h${-w}Z`;
-      const inner = this.circle
-        ? `M${this.circle.x - this.circle.r} ${this.circle.y}a${this.circle.r} ${this.circle.r} 0 1 0 ${2 * this.circle.r} 0a${this.circle.r} ${this.circle.r} 0 1 0 ${-2 * this.circle.r} 0Z`
-        : "";
+  closePath() {
+    this.path.push("Z");
+  }
+  fill(rule = "nonzero") {
+    if (this.path.length)
       this.parts.push(
-        `<path d="${outer}${inner}" fill-rule="evenodd" fill="${escape(this.fillStyle)}" opacity="${this.globalAlpha}"/>`,
+        `<path d="${this.path.join(" ")}" fill-rule="${rule}" fill="${escape(this.fillStyle)}" opacity="${this.globalAlpha}"/>`,
       );
-    } else if (this.circle) {
-      const { x, y, r } = this.circle;
-      this.parts.push(
-        `<circle cx="${x}" cy="${y}" r="${r}" fill="${escape(this.fillStyle)}" opacity="${this.globalAlpha}"/>`,
-      );
-    }
-    this.circle = null;
-    this.box = null;
   }
   moveTo(x, y) {
     this.path.push(`M${x} ${y}`);
@@ -591,6 +633,6 @@ export class SVGContext {
       );
   }
   serialize() {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${this.width}" height="${this.height}" viewBox="0 0 ${this.width} ${this.height}"><style>${this.fontFace}</style>${this.parts.join("")}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${this.width}" height="${this.height}" viewBox="0 0 ${this.width} ${this.height}"><style>${this.fontFace}</style>${this.parts.join("")}</svg>`;
   }
 }

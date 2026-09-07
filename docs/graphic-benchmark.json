@@ -1,0 +1,91 @@
+{
+  "runtime": "Node + Skia Canvas; warmed median of 12 frames; excludes video decode and encode",
+  "cellSize": 8,
+  "baseline": "29d0eb0",
+  "results": [
+    {
+      "case": "Bayer preview",
+      "beforeMs": 1.24,
+      "afterMs": 1.22,
+      "speedup": 1.02
+    },
+    {
+      "case": "Bayer 1080p",
+      "beforeMs": 1.83,
+      "afterMs": 1.43,
+      "speedup": 1.28
+    },
+    {
+      "case": "Bayer 4K",
+      "beforeMs": 3.02,
+      "afterMs": 2.89,
+      "speedup": 1.04
+    },
+    {
+      "case": "Floyd 1080p",
+      "beforeMs": 4.41,
+      "afterMs": 4.54,
+      "speedup": 0.97
+    },
+    {
+      "case": "ASCII 1080p",
+      "beforeMs": 36.61,
+      "afterMs": 40.36,
+      "speedup": 0.91
+    },
+    {
+      "case": "Edges 1080p",
+      "beforeMs": 9.79,
+      "afterMs": 8.06,
+      "speedup": 1.21
+    },
+    {
+      "case": "Halftone 1080p",
+      "beforeMs": null,
+      "afterMs": 45.76,
+      "speedup": null
+    },
+    {
+      "case": "Crosshatch 1080p",
+      "beforeMs": null,
+      "afterMs": 29.61,
+      "speedup": null
+    },
+    {
+      "case": "Contour beads preview",
+      "beforeMs": null,
+      "afterMs": 15.39,
+      "speedup": null
+    },
+    {
+      "case": "Contour beads 1080p",
+      "beforeMs": null,
+      "afterMs": 38.79,
+      "speedup": null
+    },
+    {
+      "case": "Dot mosaic preview",
+      "beforeMs": null,
+      "afterMs": 17.42,
+      "speedup": null
+    },
+    {
+      "case": "Dot mosaic 1080p",
+      "beforeMs": null,
+      "afterMs": 46.74,
+      "speedup": null
+    },
+    {
+      "case": "Symbol field preview",
+      "beforeMs": null,
+      "afterMs": 15.31,
+      "speedup": null
+    },
+    {
+      "case": "Symbol field 1080p",
+      "beforeMs": null,
+      "afterMs": 39.85,
+      "speedup": null
+    }
+  ]
+}

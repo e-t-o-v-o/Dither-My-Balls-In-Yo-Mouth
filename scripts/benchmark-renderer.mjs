@@ -79,11 +79,18 @@ try {
     ["Edges 1080p", "edge", "ordered", 1920],
     ["Halftone 1080p", "halftone", "ordered", 1920],
     ["Crosshatch 1080p", "crosshatch", "ordered", 1920],
+    ["Contour beads preview", "beads", "ordered", 960],
+    ["Contour beads 1080p", "beads", "ordered", 1920],
+    ["Dot mosaic preview", "mosaic", "ordered", 960],
+    ["Dot mosaic 1080p", "mosaic", "ordered", 1920],
+    ["Symbol field preview", "symbols", "ordered", 960],
+    ["Symbol field 1080p", "symbols", "ordered", 1920],
   ];
   const rows = cases.map(([name, effect, method, width]) => {
     const c = { ...model.defaults, effect, method };
     const before =
-      baseline && !["halftone", "crosshatch"].includes(effect)
+      baseline &&
+      !["halftone", "crosshatch", "beads", "mosaic", "symbols"].includes(effect)
         ? measure(baseline.FrameRenderer, c, width)
         : null;
     const after = measure(current.FrameRenderer, c, width);
