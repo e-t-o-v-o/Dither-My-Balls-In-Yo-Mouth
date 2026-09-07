@@ -1,6 +1,6 @@
 # Dither — by etovo
 
-A local video, image, and webcam effects studio. The v2 overhaul rebuilds the original camera-effects prototype around video editing and export, with a desktop workspace and a touch layout for iPad.
+A local video, image, and webcam effects studio. The v2.1 studio rebuilds the original camera-effects prototype around video editing and export, with a desktop workspace and a touch layout for iPad.
 
 ## Use the studio
 
@@ -14,12 +14,12 @@ The app never uploads your media. Settings and named presets are stored locally,
 ## What is included
 
 - Six distinct color-aware dithering methods: Bayer, Floyd–Steinberg, Atkinson, Jarvis–Judice–Ninke, Burkes, and Sierra.
-- ASCII, dithered ASCII, palette quantization, two tone, binary, color-index labels, number blocks, custom-character blocks, letter palettes, edge detection, and RGB channel views.
+- Ten focused effects: Dither, ASCII, Dither + ASCII, Palette, Threshold, Halftone, Crosshatch, Edges, Channel study, and Pixelate. Binary, number, and character treatments are overlays; letter palettes are ASCII ramps. Existing presets migrate automatically.
 - Original palette and character-set collections, plus four concise default palettes and six starting looks.
 - Brightness, contrast, saturation, inversion, transparency, chroma keying, and temporal smoothing.
 - Video playback, scrubbing, looping, trim controls, audio monitoring, and undo/redo of effect settings.
 - Separate preview and export resolutions; 4K landscape and equivalent portrait exports preserve aspect ratio.
-- PNG and SVG current-frame exports; looping GIF; native MP4 and/or WebM recording where supported.
+- Frame-by-frame MP4/WebM at 24, 30, or 60 fps where WebCodecs is available; live recording for compatibility and cameras; looping GIF; PNG and SVG frames.
 - Export progress, cancellation, encoding/decode errors, source cleanup, and explicit download/share actions.
 - Keyboard navigation, native modal focus management, dark/light appearance, and responsive inspector layouts.
 
@@ -36,6 +36,8 @@ npm start
 npm run test:ci
 npm run build
 node scripts/check-gif-worker.cjs
+npm run test:exports # Requires ffmpeg / ffprobe
+npm run benchmark -- ebdbb2c
 npm audit
 ```
 
@@ -47,13 +49,14 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 
 | Output | Behavior |
 | --- | --- |
-| MP4 / WebM | Only browser-supported encoders are offered. The file extension follows the actual container returned by the recorder. WebM duration metadata is repaired for seeking and re-import. Records the trim in real time, at a requested 24 or 30 fps. Source audio is optional. |
-| GIF | Deterministic frame-by-frame video seeking; 10–15 fps; up to 720 px on the longest edge. Loops forever. Silent. Up to 30 seconds and 60 million uncompressed frame pixels, whichever is smaller. |
+| MP4 / WebM · Frame by frame | Independent decoding, rendering, and encoding, with timestamped frames at 24/30/60 fps. Auto checks video and audio encoders; MP4 uses H.264/AAC, WebM uses VP8/Opus (or VP9 for Maximum quality where available). Audio shares the video trim. Missing requested tracks stop the export with an explanation. Requires WebCodecs and a secure context. |
+| MP4 / WebM · Live recording | Compatibility fallback and live camera capture. Uses a timed rendering loop and native MediaRecorder; requested frame rate can still be missed. File extensions follow the actual container; WebM duration metadata is repaired. |
+| GIF | Deterministic frame-by-frame video seeking; 10–15 fps; up to 720 px on the longest edge. Cumulative centisecond timing avoids shortened GIFs. Loops forever. Silent. Up to 30 seconds and 60 million uncompressed frame pixels, whichever is smaller. |
 | PNG | Current frame, with alpha where the chosen effect leaves transparent regions. |
-| SVG | Vector cells and text. Source underlay, when enabled, is embedded as a raster image. Uploaded font data is embedded. |
+| SVG | Vector cells, dots, strokes, and text. Source underlay embeds a raster image; uploaded fonts are embedded. A 250,000-cell limit prevents excessive memory use. |
 
-- Keep the tab visible during video export. Backgrounding stops the job with a recoverable explanation instead of silently recording stalled frames. A screen wake lock is requested where available.
-- Native video recording is device-dependent and is **not** an offline, frame-exact video encoder. Expensive effects or 4K may miss the requested frame rate; the completion screen reports low rendering throughput. Lower resolution or increase cell size in that case.
+- Keep the tab visible during live recording; backgrounding stops that job with a recoverable explanation. Frame-by-frame export does not rely on playback or screen refresh. A screen wake lock is requested where available.
+- Prefer **Frame by frame** for reliable motion. **High** balances detail and file size; **Maximum** increases bitrate for fine textures. Live recording remains device-dependent; its completion screen reports low rendering throughput. The requested 60 fps can duplicate frames from a slower source; it does not invent motion.
 - Video export uses an opaque background. GIF uses the selected background color. Choose PNG/SVG for transparent assets.
 - Camera capture is intentionally silent. Camera-to-GIF is not offered: record a video, then import it for a GIF.
 - Native export is capped at 4096 px on the longest edge. Imports are limited to 2 GB and recording data to 512 MB. Large images still require enough device memory to decode.
@@ -70,5 +73,10 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 - `src/studio/renderer.js`: shared canvas/vector rendering and the built-in test signal.
 - `src/studio/media.js`: decode/seek lifecycle, cancellation, camera cleanup, and audio routing.
 - `src/studio/export.js`: image/vector output, GIF sequencing, and native recorder lifecycle.
+- `src/studio/precise-export.js`: lazy-loaded Mediabunny/WebCodecs decoding, timestamped export, codec checks, cancellation, and audio trim.
+- `scripts/benchmark-renderer.mjs`: reproducible render-only comparison with a prior commit.
+- `scripts/check-precise-export.mjs`: actual H.264/AAC and VP8/Opus output, frame counts, timed audio pulses, cancellation recovery, and portrait 60 fps using native test adapters.
+
+See [the performance and quality review](docs/PERFORMANCE.md) for measured gains and validation limits.
 
 See [the complete audit](docs/AUDIT.md) for the original defects, corresponding repairs, test evidence, and verification limits.

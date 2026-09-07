@@ -96,3 +96,50 @@ test("transparent cells do not diffuse hidden color into neighbors", () => {
   );
   expect([...out.slice(4)]).toEqual([0, 0, 0, 255]);
 });
+test.each([
+  [0, 0],
+  [64, 4],
+  [128, 8],
+  [192, 12],
+  [255, 16],
+])(
+  "Bayer reproduces level %s across the complete 4×4 tonal range",
+  (level, whiteCells) => {
+    const input = new Uint8ClampedArray(4 * 4 * 4);
+    for (let i = 0; i < input.length; i += 4) {
+      input[i] = input[i + 1] = input[i + 2] = level;
+      input[i + 3] = 255;
+    }
+    const out = dither(
+      input,
+      4,
+      4,
+      [
+        [0, 0, 0],
+        [255, 255, 255],
+      ],
+      "ordered",
+    );
+    let count = 0;
+    for (let i = 0; i < out.length; i += 4) if (out[i] === 255) count++;
+    expect(count).toBe(whiteCells);
+  },
+);
+test("diffusion conserves error beyond the RGB endpoints", () => {
+  const data = new Uint8ClampedArray([
+    250, 250, 250, 255, 250, 250, 250, 255, 128, 128, 128, 255,
+  ]);
+  const out = dither(
+    data,
+    3,
+    1,
+    [
+      [20, 20, 20],
+      [230, 230, 230],
+    ],
+    "floyd",
+  );
+  expect([...out]).toEqual([
+    230, 230, 230, 255, 230, 230, 230, 255, 230, 230, 230, 255,
+  ]);
+});

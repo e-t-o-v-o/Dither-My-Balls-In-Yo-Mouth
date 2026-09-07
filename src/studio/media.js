@@ -113,6 +113,7 @@ export async function loadFile(file, signal) {
       height,
       duration: image ? 0 : element.duration,
       name: file.name,
+      file,
     };
   } catch (e) {
     if (video) {

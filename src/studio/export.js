@@ -43,6 +43,15 @@ export async function exportStill({
     signalCanvas = document.createElement("canvas"),
     renderer = new FrameRenderer();
   const { width, height } = dimensions(source.width, source.height, resolution);
+  if (
+    format === "svg" &&
+    (Math.ceil(1920 / config.cellSize) ** 2 * Math.min(width, height)) /
+      Math.max(width, height) >
+      250000
+  )
+    throw new Error(
+      "This SVG would contain too many vector cells. Increase cell size or export a PNG.",
+    );
   const context =
     format === "svg" ? new SVGContext(width, height, fontFace) : null;
   renderer.render(
@@ -112,6 +121,8 @@ export async function recordVideo({
       config,
       width,
       height,
+      null,
+      time,
     );
   render(start);
   checkAbort(signal);
@@ -147,7 +158,7 @@ export async function recordVideo({
       frames = 0;
     const chunks = [];
     const cleanup = () => {
-      cancelAnimationFrame(raf);
+      clearTimeout(raf);
       clearTimeout(timer);
       signal?.removeEventListener("abort", abort);
       document.removeEventListener("visibilitychange", visibility);
@@ -162,7 +173,7 @@ export async function recordVideo({
     };
     const stop = (e) => {
       if (e) error = e;
-      cancelAnimationFrame(raf);
+      clearTimeout(raf);
       if (recorder.state !== "inactive") {
         recorder.stop();
         if (!settled)
@@ -276,7 +287,10 @@ export async function recordVideo({
           stop();
           return;
         }
-        raf = requestAnimationFrame(frame);
+        raf = setTimeout(
+          () => frame(performance.now()),
+          Math.max(1, 1000 / fps - (performance.now() - now)),
+        );
       } catch (e) {
         stop(e);
       }
@@ -293,12 +307,21 @@ export async function recordVideo({
           await source.element.play();
         }
         checkAbort(signal);
-        raf = requestAnimationFrame(frame);
+        raf = setTimeout(() => frame(performance.now()), 0);
       } catch (e) {
         stop(e);
       }
     })();
   });
+}
+// GIF stores centiseconds. Round cumulative timestamps so errors do not accumulate.
+export function gifFrameDelay(frame, fps, duration) {
+  return Math.max(
+    10,
+    (Math.round(Math.min(duration, (frame + 1) / fps) * 100) -
+      Math.round((frame / fps) * 100)) *
+      10,
+  );
 }
 export function gifBudget(width, height, seconds, fps) {
   return width * height * Math.ceil(seconds * fps) <= 60000000 && seconds <= 30;
@@ -348,10 +371,12 @@ export async function exportGIF({
         { ...config, transparent: false },
         width,
         height,
+        null,
+        time,
       );
       gif.addFrame(canvas, {
         copy: true,
-        delay: Math.min(1 / fps, end - start - frame / fps) * 1000,
+        delay: gifFrameDelay(frame, fps, end - start),
       });
       onProgress?.((frame / count) * 0.65);
       await new Promise((resolve) => setTimeout(resolve, 0));

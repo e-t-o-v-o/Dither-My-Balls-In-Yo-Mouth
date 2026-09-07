@@ -84,3 +84,29 @@ test("inherited object keys cannot be selected as palettes", () => {
   expect(sanitizeConfig({ palette: "toString" }).palette).toBe("Paper");
   expect(sanitizeConfig({ palette: "constructor" }).palette).toBe("Paper");
 });
+test("consolidated effects preserve legacy presets and overlays", () => {
+  expect(sanitizeConfig({ effect: "decade" })).toMatchObject({
+    effect: "palette",
+    overlay: "number",
+  });
+  expect(sanitizeConfig({ effect: "binary" })).toMatchObject({
+    effect: "two-tone",
+    overlay: "binary",
+  });
+  expect(sanitizeConfig({ effect: "binary-char" })).toMatchObject({
+    effect: "two-tone",
+    overlay: "luma",
+  });
+  expect(sanitizeConfig({ effect: "letter-char", char: "Z" })).toMatchObject({
+    effect: "two-tone",
+    overlay: "character",
+    char: "Z",
+  });
+  expect(
+    sanitizeConfig({ effect: "letters-palette", letterCount: 3 }),
+  ).toMatchObject({ effect: "ascii", characters: "ABC" });
+  expect(sanitizeConfig({ effect: "green-screen" })).toMatchObject({
+    effect: "pixel",
+    removeGreen: true,
+  });
+});

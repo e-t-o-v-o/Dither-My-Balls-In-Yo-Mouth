@@ -1,5 +1,7 @@
 # Dither v2 audit and overhaul
 
+**Historical v2 audit.** The subsequent performance and export changes are documented in [PERFORMANCE.md](PERFORMANCE.md).
+
 Audited against main commit `ea7a435ce8215e5f0e1d818af5e2a68a124cec8e`. Scope: all tracked application modules, both dithering workers, build/dependency configuration, export paths, local data handling, and existing tests. Product direction: video and export first; desktop and iPad equally important.
 
 ## Findings and resolutions
