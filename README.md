@@ -1,144 +1,74 @@
-# Getting Started with Create React App
+# Dither — by etovo
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A local video, image, and webcam effects studio. The v2 overhaul rebuilds the original camera-effects prototype around video editing and export, with a desktop workspace and a touch layout for iPad.
 
-## Available Scripts
+## Use the studio
 
-In the project directory, you can run:
+1. Open a video or image, enable the camera, or experiment with the built-in moving test signal.
+2. Pick a starting look. Adjust **Effects** and **Color**, then use **Before / after** to compare.
+3. Scrub the timeline. Set **In** and **Out** in seconds, or use **Set here** at the playhead.
+4. Choose **Export**, select the format and resolution, and create the file. A completed export stays available behind a Download button, including on iPad.
 
-### `npm start`
+The app never uploads your media. Settings and named presets are stored locally, with validated JSON import/export for backups. Original media is unchanged. Imported fonts are session-local and embedded in vector exports.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## What is included
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- Six distinct color-aware dithering methods: Bayer, Floyd–Steinberg, Atkinson, Jarvis–Judice–Ninke, Burkes, and Sierra.
+- ASCII, dithered ASCII, palette quantization, two tone, binary, color-index labels, number blocks, custom-character blocks, letter palettes, edge detection, and RGB channel views.
+- Original palette and character-set collections, plus four concise default palettes and six starting looks.
+- Brightness, contrast, saturation, inversion, transparency, chroma keying, and temporal smoothing.
+- Video playback, scrubbing, looping, trim controls, audio monitoring, and undo/redo of effect settings.
+- Separate preview and export resolutions; 4K landscape and equivalent portrait exports preserve aspect ratio.
+- PNG and SVG current-frame exports; looping GIF; native MP4 and/or WebM recording where supported.
+- Export progress, cancellation, encoding/decode errors, source cleanup, and explicit download/share actions.
+- Keyboard navigation, native modal focus management, dark/light appearance, and responsive inspector layouts.
 
-### `npm test`
+## Run and verify
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Requires Node **24** (minimum 22.12) and npm.
 
-### `npm run build`
+```sh
+npm ci
+npm start
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```sh
+npm run test:ci
+npm run build
+node scripts/check-gif-worker.cjs
+npm audit
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+`npm start` and `npm run build` first copy the locally installed GIF encoder worker into `public/`. No CDN is needed at runtime. Production output is **build/**. `npm run preview` serves an already-built result.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+The checked-in Netlify configuration continues to publish `build/`. Vite uses relative asset paths so a build also works beneath a GitHub Pages repository path. Publishing is separate from the verification workflow; the workflow uploads a build artifact and does not deploy or merge changes.
 
-### `npm run eject`
+## Export behavior and limits
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+| Output | Behavior |
+| --- | --- |
+| MP4 / WebM | Only browser-supported encoders are offered. The file extension follows the actual container returned by the recorder. WebM duration metadata is repaired for seeking and re-import. Records the trim in real time, at a requested 24 or 30 fps. Source audio is optional. |
+| GIF | Deterministic frame-by-frame video seeking; 10–15 fps; up to 720 px on the longest edge. Loops forever. Silent. Up to 30 seconds and 60 million uncompressed frame pixels, whichever is smaller. |
+| PNG | Current frame, with alpha where the chosen effect leaves transparent regions. |
+| SVG | Vector cells and text. Source underlay, when enabled, is embedded as a raster image. Uploaded font data is embedded. |
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- Keep the tab visible during video export. Backgrounding stops the job with a recoverable explanation instead of silently recording stalled frames. A screen wake lock is requested where available.
+- Native video recording is device-dependent and is **not** an offline, frame-exact video encoder. Expensive effects or 4K may miss the requested frame rate; the completion screen reports low rendering throughput. Lower resolution or increase cell size in that case.
+- Video export uses an opaque background. GIF uses the selected background color. Choose PNG/SVG for transparent assets.
+- Camera capture is intentionally silent. Camera-to-GIF is not offered: record a video, then import it for a GIF.
+- Native export is capped at 4096 px on the longest edge. Imports are limited to 2 GB and recording data to 512 MB. Large images still require enough device memory to decode.
+- Animated GIF input is an image source, not an editable video timeline. Import video for controlled animated conversion.
+- Browser-supported input codecs determine which video files can open. An MP4 or MOV container does not guarantee a decodable codec. H.264 MP4 is a useful interchange format.
+- Temporal trails depend on preceding frames. A PNG/SVG still is intentionally rendered without a temporal trail; a video or GIF initializes its trail at the trim start.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Structure
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- `src/App.jsx`: media/editor orchestration, history, timeline, local presets, and export UI.
+- `src/studio/Controls.jsx`: accessible inspector controls and icons.
+- `src/studio/model.js`: settings validation, legacy migration, palettes, dimensions, and formatting.
+- `src/studio/pixels.js`: pure pixel adjustments, six dithering kernels, and edge detection.
+- `src/studio/renderer.js`: shared canvas/vector rendering and the built-in test signal.
+- `src/studio/media.js`: decode/seek lifecycle, cancellation, camera cleanup, and audio routing.
+- `src/studio/export.js`: image/vector output, GIF sequencing, and native recorder lifecycle.
 
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
-
-# Effects & Settings
-
-## Effects
-
-### channel
-Splits the image into its red, green, and blue channel intensity maps, rendering each channel as a separate grayscale block.
-
-### two-tone
-Renders each pixel block in either the foreground color or background color based on the brightness threshold.
-
-### binary
-Similar to two-tone but fills fixed-size blocks with fg/bg colors according to threshold.
-
-### decade
-Groups brightness into numeric decades (0–9) and maps each decade to a color from the selected `decadePalette`. Controlled by `extractCount`.
-
-### ascii
-Converts pixel brightness to ASCII characters, rendering a character grid. Uses `asciiVariant`, `font`, `fontSize`, and colors from `charPalette`. Optionally overlays ASCII over the live video/image when `asciiUnderlay` is enabled.
-
-### dither
-Applies an 8×8 ordered or Floyd–Steinberg dithering algorithm to approximate shades using a limited palette. Controlled by `ditherMethod` and `ditherPalette`.
-
-### dither-ascii
-Combines dithering with ASCII mapping: first dithers the image, then renders ASCII characters based on dithered brightness.
-
-### green-screen
-Detects green-dominant pixels and replaces them with the chosen `bgColor`. If `removeGreen` is true, characters or blocks over green areas are omitted.
-
-### binary-char
-Renders threshold-based blocks and overlays a numeric character (0–9) indicating brightness level. Settings: `threshold`, `charPalette`, `fgColor`, `bgColor`.
-
-### letter-char
-Renders blocks filled by threshold and overlays a custom `char` on each block. Controlled by `threshold`, `char`, `font`, `fontSize`, `fgColor`, `bgColor`.
-
-### letters-palette
-Fills blocks with colors from `paletteName` and overlays letters from a preset list sized by `letterCount`. Uses `fgColor` for text.
-
-### palette
-Renders blocks in the nearest palette color (`paletteName`) and optionally overlays numbers or characters based on `overlayType` (`none`, `number`, `character`).
-
-### edge
-Applies a convolution edge-detection filter to highlight contours in high contrast. Adjustable via `threshold`, `fgColor`, `bgColor`.
-
-## Settings
-
-| Name               | Type                             | Default   | Description                                                                                   |
-|--------------------|----------------------------------|-----------|-----------------------------------------------------------------------------------------------|
-| mode               | 'video'  'video-file'  'image' | video     | Source: webcam, uploaded video, or uploaded image.                                             |
-| effect             | string                           | channel   | Active effect to apply (see Effects above).                                                   |
-| fgColor            | string (hex)                     | #FFFFFF   | Foreground/text color.                                                                        |
-| bgColor            | string (hex)                     | #000000   | Background color.                                                                             |
-| threshold          | number (0–255)                   | 128       | Brightness cutoff for threshold-based effects.                                                |
-| pixelSize          | number (px)                      | 20        | Size of pixel blocks for pixelated effects.                                                   |
-| font               | string                           | Arial     | Font family for text overlays.                                                                |
-| fontSize           | number (px)                      | 20        | Font size for text overlays.                                                                  |
-| recordingFormat    | 'mp4'  'gif'               | mp4       | Format for recording canvas output.                                                           |
-| decadePalette      | string                           | Default   | Name of color palette used by Decade effect.                                                  |
-| charPalette        | string                           | Default   | Name of color palette used by character-based effects.                                        |
-| ditherPalette      | string                           | Default   | Name of palette used for dithering effects.                                                   |
-| ditherMethod       | 'ordered'  'floyd'         | ordered   | Dithering algorithm: ordered matrix or Floyd–Steinberg error diffusion.                        |
-| smoothFactor       | number (0–1)                     | 1         | Interpolation for real-time smoothing (0 = static frame).                                     |
-| char               | string                           | .         | Character to render in char-based overlays.                                                   |
-| letterCount        | number                           | 10        | Number of letters to map in Letters-Palette effect.                                           |
-| extractCount       | number                           | 8         | Number of brightness levels/groups in Decade effect.                                          |
-| asciiVariant       | string                           | Default   | ASCII character set variant for ASCII-based effects.                                          |
-| asciiMapping       | 'static'  'dynamic'       | dynamic   | Static uses fixed mapping; dynamic adjusts mapping per frame.                                  |
-| transparentBg      | boolean                          | false     | Render a transparent background instead of solid bgColor.                                     |
-| outputResolution   | 'native'  '1080p'  '4k' | native    | Canvas resolution mode: source native, 1080p, or full 4K.                                     |
-| imageDownloadType  | string                           | png4x     | Download format for images (e.g. png, png4x, svg).                                            |
-| overlayType        | 'none'  'number'  'character' | number    | Overlay style for Palette effect; none, numeric index, or custom character.                  |
-| removeGreen        | boolean                          | false     | Omit or mask green areas in Green-Screen effect.                                              |
-| asciiUnderlay      | boolean                          | false     | Draws the underlying source beneath ASCII characters when enabled.                             |
-|--------------------|----------------------------------|-----------|-----------------------------------------------------------------------------------------------|
+See [the complete audit](docs/AUDIT.md) for the original defects, corresponding repairs, test evidence, and verification limits.

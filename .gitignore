@@ -24,3 +24,7 @@ yarn-error.log*
 
 # Local Netlify folder
 .netlify
+
+# generated export worker
+/public/gif.worker.js
+/dist
