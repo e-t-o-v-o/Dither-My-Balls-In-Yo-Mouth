@@ -96,6 +96,11 @@ async function bundle(entry, name) {
   await writeFile(file, code);
   return import(file);
 }
+// Native codec callbacks do not keep Node's event loop alive on every platform.
+// Keep this check alive until completion, and fail boundedly if a codec stalls.
+const watchdog = setTimeout(() => {
+  throw new Error("Precise export integration check exceeded 120 seconds.");
+}, 120_000);
 try {
   const { exportPrecise } = await bundle(
     path.join(root, "src/studio/precise-export.js"),
@@ -298,5 +303,6 @@ try {
     ),
   );
 } finally {
+  clearTimeout(watchdog);
   await rm(dir, { recursive: true, force: true });
 }
