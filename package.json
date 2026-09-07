@@ -1,6 +1,6 @@
 {
   "name": "dither-studio",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "dependencies": {
     "fix-webm-duration": "^1.0.6",
@@ -20,7 +20,8 @@
     "dev": "vite",
     "predev": "node scripts/copy-export-assets.cjs",
     "benchmark": "node scripts/benchmark-renderer.mjs",
-    "test:exports": "node scripts/check-precise-export.mjs"
+    "test:exports": "node scripts/check-precise-export.mjs",
+    "previews": "node scripts/render-style-previews.mjs"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.8",

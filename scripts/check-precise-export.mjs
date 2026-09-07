@@ -106,7 +106,7 @@ try {
     path.join(root, "src/studio/precise-export.js"),
     "export",
   );
-  const { defaults } = await bundle(
+  const { defaults, looks } = await bundle(
     path.join(root, "src/studio/model.js"),
     "model",
   );
@@ -140,10 +140,13 @@ try {
   };
   const results = [];
   for (const format of ["mp4", "webm"]) {
+    const config = looks.find(
+      (look) => look.name === (format === "mp4" ? "Cobalt beads" : "Acid dots"),
+    ).config;
     const started = performance.now();
     const output = await exportPrecise({
       source,
-      config: defaults,
+      config,
       resolution: "native",
       format,
       fps: 30,
@@ -225,6 +228,7 @@ try {
       "Silence between audio pulses is preserved",
     );
     results.push({
+      effect: config.effect,
       format: output.extension,
       video: video.codec_name,
       audio: audio.codec_name,
@@ -254,7 +258,11 @@ try {
   );
   const recovery = await exportPrecise({
     source: { kind: "demo", width: 180, height: 320 },
-    config: defaults,
+    config: {
+      ...looks.find((look) => look.name === "Wayfinding").config,
+      maskMode: "luminance",
+      maskBackdrop: true,
+    },
     resolution: "native",
     format: "mp4",
     fps: 60,

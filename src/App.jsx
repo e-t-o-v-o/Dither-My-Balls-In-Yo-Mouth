@@ -19,6 +19,7 @@ import {
   dimensions,
   timeLabel,
   filename,
+  usesPalette,
 } from "./studio/model";
 import { exportPrecise, hasPreciseExport } from "./studio/precise-export";
 import { FrameRenderer, drawSignal } from "./studio/renderer";
@@ -40,6 +41,7 @@ import {
   Icon,
   EffectControls,
   ColorControls,
+  MaskControls,
   Select,
   Check,
 } from "./studio/Controls";
@@ -69,11 +71,26 @@ function historyReducer(state, a) {
             ...state.present,
             effect: a.value,
             overlay: "none",
-            ...(["ascii", "dither-ascii", "halftone"].includes(a.value)
+            ...([
+              "ascii",
+              "dither-ascii",
+              "halftone",
+              "mosaic",
+              "symbols",
+              "beads",
+            ].includes(a.value)
               ? { cellSize: Math.max(14, state.present.cellSize) }
               : {}),
-            ...(a.value === "crosshatch"
+            ...(["crosshatch", "symbols"].includes(a.value)
               ? { fgColor: "#101215", bgColor: "#f1f2e9" }
+              : {}),
+            ...(a.value === "symbols" ? { shapeColor: "ink" } : {}),
+            ...(a.value === "beads"
+              ? {
+                  fgColor: "#103eac",
+                  accentColor: "#60b5de",
+                  bgColor: "#f44913",
+                }
               : {}),
           }
         : { ...state.present, [a.key]: a.value }),
@@ -166,13 +183,13 @@ function App() {
       initialHistory,
     ),
     config = history.present;
-  const paletteEffect =
-    ["dither", "dither-ascii", "palette"].includes(config.effect) ||
-    (config.effect === "ascii" && config.textColor === "palette");
+  const paletteEffect = usesPalette(config);
   const colorSummary = paletteEffect
     ? `${palettes[config.palette].length} palette colors`
     : ["pixel", "channel"].includes(config.effect) ||
-        (config.effect === "ascii" && config.textColor === "source")
+        (config.effect === "ascii" && config.textColor === "source") ||
+        (["mosaic", "symbols"].includes(config.effect) &&
+          config.shapeColor === "source")
       ? "Source color"
       : "Custom ink";
   const [source, setSource] = useState(demo),
@@ -183,6 +200,7 @@ function App() {
     [trim, setTrim] = useState([0, 8]),
     trimRef = useRef(trim);
   const [tab, setTab] = useState("effects"),
+    [allStyles, setAllStyles] = useState(false),
     [compare, setCompare] = useState(false),
     [split, setSplit] = useState(50),
     [previewSize, setPreviewSize] = useState("960");
@@ -1090,34 +1108,31 @@ function App() {
           </div>
           <section className="looks-section">
             <div className="section-heading">
-              <h2>Starting points</h2>
-              <span>Make it yours</span>
+              <h2>Style starters</h2>
+              <button
+                className="text-button"
+                onClick={() => setAllStyles((v) => !v)}
+                aria-expanded={allStyles}
+              >
+                {allStyles ? "Show featured" : `All ${looks.length} styles`}
+              </button>
             </div>
             <div className="looks">
-              {looks.map((look, i) => (
+              {(allStyles ? looks : looks.slice(0, 6)).map((look) => (
                 <button
                   key={look.name}
-                  className={`look look-${i}`}
+                  className="look"
+                  aria-pressed={Object.keys(look.config).every(
+                    (key) => look.config[key] === config[key],
+                  )}
                   onClick={() => {
                     dispatch({ config: look.config });
                     setSelectedPreset("");
+                    setTab("effects");
                   }}
                   disabled={busy}
                 >
-                  <div
-                    className="look-pattern"
-                    aria-hidden="true"
-                    style={{
-                      "--ink": palettes[look.config.palette].at(-1),
-                      "--paper": palettes[look.config.palette][0],
-                    }}
-                  >
-                    {look.config.effect === "ascii"
-                      ? "Aa"
-                      : look.config.overlay === "number"
-                        ? "012"
-                        : "▒▓"}
-                  </div>
+                  <StylePreview look={look} />
                   <strong>{look.name}</strong>
                   <span>{look.note}</span>
                 </button>
@@ -1134,24 +1149,30 @@ function App() {
             {[
               ["effects", "Effects"],
               ["color", "Color"],
+              ["mask", "Mask"],
               ["presets", "Presets"],
             ].map(([id, label]) => (
               <button
                 key={id}
                 id={`tab-${id}`}
                 role="tab"
+                aria-label={
+                  id === "mask" && config.maskMode !== "none"
+                    ? "Mask, active"
+                    : label
+                }
                 aria-selected={tab === id}
                 aria-controls={`panel-${id}`}
                 tabIndex={tab === id ? 0 : -1}
                 onKeyDown={(e) => {
                   if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
                     e.preventDefault();
-                    const tabs = ["effects", "color", "presets"],
+                    const tabs = ["effects", "color", "mask", "presets"],
                       next =
                         tabs[
                           (tabs.indexOf(tab) +
-                            (e.key === "ArrowRight" ? 1 : 2)) %
-                            3
+                            (e.key === "ArrowRight" ? 1 : 3)) %
+                            4
                         ];
                     setTab(next);
                     document.getElementById(`tab-${next}`).focus();
@@ -1160,6 +1181,9 @@ function App() {
                 onClick={() => setTab(id)}
               >
                 {label}
+                {id === "mask" && config.maskMode !== "none" && (
+                  <span className="mask-indicator" aria-hidden="true" />
+                )}
               </button>
             ))}
           </div>
@@ -1179,6 +1203,7 @@ function App() {
                 />
               )}
               {tab === "color" && <ColorControls config={config} set={set} />}
+              {tab === "mask" && <MaskControls config={config} set={set} />}
               {tab === "presets" && (
                 <>
                   <section className="inspector-section">
@@ -1635,6 +1660,19 @@ function App() {
         </Dialog>
       )}
     </div>
+  );
+}
+function StylePreview({ look }) {
+  const slug = look.name.toLowerCase().replace(/\s+/g, "-");
+  return (
+    <img
+      className="style-preview"
+      src={`${import.meta.env.BASE_URL}styles/${slug}.png`}
+      alt=""
+      loading="lazy"
+      width="240"
+      height="144"
+    />
   );
 }
 export default App;

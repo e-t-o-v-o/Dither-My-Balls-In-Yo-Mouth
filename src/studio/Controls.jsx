@@ -1,5 +1,12 @@
-import React, { useId } from "react";
-import { effects, methods, palettes, fonts, asciiVariants } from "./model";
+import React, { useId, useState, useEffect } from "react";
+import {
+  effects,
+  methods,
+  palettes,
+  fonts,
+  asciiVariants,
+  usesPalette,
+} from "./model";
 export function Icon({ name, ...props }) {
   const paths = {
     play: "M8 5l11 7-11 7V5Z",
@@ -103,7 +110,132 @@ export function Check({ label, value, onChange, description }) {
     </label>
   );
 }
+function ColorInput({ label, value, onChange }) {
+  return (
+    <label className="control">
+      {label}
+      <span className="color-input">
+        <input
+          aria-label={label}
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <span className="mono">{value.toUpperCase()}</span>
+      </span>
+    </label>
+  );
+}
+export function MaskControls({ config: c, set }) {
+  return (
+    <>
+      <section className="inspector-section">
+        <div className="section-heading">
+          <h2>Selection mask</h2>
+          <span>{c.maskMode === "none" ? "OFF" : "ON"}</span>
+        </div>
+        <p className="hint">
+          Choose the colors or tones that receive the effect. Transparent areas
+          in your source always stay excluded.
+        </p>
+        <Select
+          label="Select by"
+          value={c.maskMode}
+          onChange={(v) => set("maskMode", v)}
+        >
+          <option value="none">Whole image</option>
+          <option value="luminance">Brightness range</option>
+          <option value="color">Color range</option>
+        </Select>
+        {c.maskMode !== "none" && (
+          <>
+            {c.maskMode === "luminance" ? (
+              <>
+                <Range
+                  label="Dark limit"
+                  value={c.maskLow}
+                  min={0}
+                  max={c.maskHigh}
+                  onChange={(v) => set("maskLow", v)}
+                />
+                <Range
+                  label="Light limit"
+                  value={c.maskHigh}
+                  min={c.maskLow}
+                  max={255}
+                  onChange={(v) => set("maskHigh", v)}
+                />
+              </>
+            ) : (
+              <>
+                <ColorInput
+                  label="Selected color"
+                  value={c.maskColor}
+                  onChange={(v) => set("maskColor", v)}
+                />
+                <Range
+                  label="Color range"
+                  value={c.maskTolerance * 100}
+                  min={1}
+                  max={100}
+                  unit="%"
+                  onChange={(v) => set("maskTolerance", v / 100)}
+                />
+              </>
+            )}
+            <Range
+              label="Edge softness"
+              value={c.maskSoftness * 100}
+              min={0}
+              max={30}
+              unit="%"
+              onChange={(v) => set("maskSoftness", v / 100)}
+            />
+            <Check
+              label="Invert selection"
+              value={c.maskInvert}
+              onChange={(v) => set("maskInvert", v)}
+            />
+            <Check
+              label="Keep original behind effect"
+              description="Off isolates the selection on your background color or transparency."
+              value={c.maskBackdrop}
+              onChange={(v) => set("maskBackdrop", v)}
+            />
+            <button className="full" onClick={() => set("maskMode", "none")}>
+              Clear mask
+            </button>
+          </>
+        )}
+      </section>
+      <section className="inspector-section">
+        <h2>Working with cutouts</h2>
+        <p className="hint">
+          A transparent PNG gives you an exact silhouette. For video, color and
+          brightness masks follow each frame. These are color selections, not
+          automatic person detection.
+        </p>
+        <p className="hint">
+          Try Dot mosaic or Letterpress with an isolated selection. Contour
+          beads can trace its transparency edge.
+        </p>
+      </section>
+    </>
+  );
+}
 export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
+  const graphicEffects = [
+    "beads",
+    "mosaic",
+    "symbols",
+    "halftone",
+    "crosshatch",
+    "edge",
+  ];
+  const [family, setFamily] = useState(null);
+  useEffect(() => setFamily(null), [c.effect]);
+  const activeFamily =
+    family || (graphicEffects.includes(c.effect) ? "Graphic" : "Digital");
   const text =
     ["ascii", "dither-ascii"].includes(c.effect) ||
     (["palette", "two-tone"].includes(c.effect) && c.overlay !== "none");
@@ -114,22 +246,43 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           <h2>Effect</h2>
           <span>01</span>
         </div>
-        <div className="effect-grid">
-          {effects.map(([id, name, n, description]) => (
+        <div
+          className="effect-families"
+          role="group"
+          aria-label="Effect families"
+        >
+          {["Graphic", "Digital"].map((name) => (
             <button
-              key={id}
-              aria-label={name}
-              title={description}
-              className={c.effect === id ? "effect selected" : "effect"}
-              aria-pressed={c.effect === id}
-              onClick={() => set("effect", id)}
+              key={name}
+              aria-pressed={activeFamily === name}
+              onClick={() => setFamily(name)}
             >
-              <span className={`effect-art art-${id}`} aria-hidden="true">
-                {id.includes("ascii") ? "Aa" : id === "channel" ? "RGB" : ""}
-              </span>
-              <span className="effect-name">{name}</span>
+              {name}
+              <span>{name === "Graphic" ? "06" : "07"}</span>
             </button>
           ))}
+        </div>
+        <div className="effect-grid">
+          {effects
+            .filter(
+              ([id]) =>
+                graphicEffects.includes(id) === (activeFamily === "Graphic"),
+            )
+            .map(([id, name, n, description]) => (
+              <button
+                key={id}
+                aria-label={name}
+                title={description}
+                className={c.effect === id ? "effect selected" : "effect"}
+                aria-pressed={c.effect === id}
+                onClick={() => set("effect", id)}
+              >
+                <span className={`effect-art art-${id}`} aria-hidden="true">
+                  {id.includes("ascii") ? "Aa" : id === "channel" ? "RGB" : ""}
+                </span>
+                <span className="effect-name">{name}</span>
+              </button>
+            ))}
         </div>
         <p className="effect-description">
           {effects.find(([id]) => id === c.effect)?.[3]}
@@ -140,7 +293,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           <h2>Texture</h2>
           <span>02</span>
         </div>
-        {["dither", "dither-ascii", "ascii", "palette"].includes(c.effect) && (
+        {usesPalette(c) && (
           <Select
             label="Effect palette"
             value={c.palette}
@@ -177,7 +330,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
         <Range
           label="Cell size"
           value={c.cellSize}
-          min={2}
+          min={c.effect === "beads" ? 6 : 2}
           max={80}
           onChange={(v) => set("cellSize", v)}
         />
@@ -224,7 +377,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
               />
             </label>
           )}
-        {c.effect === "halftone" && (
+        {["halftone", "mosaic"].includes(c.effect) && (
           <Range
             label="Dot scale"
             value={c.dotScale}
@@ -233,6 +386,119 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
             step={0.05}
             onChange={(v) => set("dotScale", v)}
           />
+        )}
+        {["mosaic", "symbols"].includes(c.effect) && (
+          <Select
+            label="Mark color"
+            value={c.shapeColor}
+            onChange={(v) => set("shapeColor", v)}
+          >
+            <option value="source">Source color</option>
+            <option value="palette">Effect palette</option>
+            <option value="ink">Custom ink</option>
+          </Select>
+        )}
+        {c.effect === "mosaic" && (
+          <Select
+            label="Dot layout"
+            value={c.mosaicLayout}
+            onChange={(v) => set("mosaicLayout", v)}
+          >
+            <option value="staggered">Staggered rows</option>
+            <option value="square">Square grid</option>
+          </Select>
+        )}
+        {c.effect === "symbols" && (
+          <>
+            <Select
+              label="Symbol family"
+              value={c.symbolSet}
+              onChange={(v) => set("symbolSet", v)}
+            >
+              <option value="mixed">Mixed geometry</option>
+              <option value="orbital">Orbital · dots & rings</option>
+              <option value="directional">
+                Directional · arrows & slashes
+              </option>
+            </Select>
+            {c.shapeColor === "ink" && (
+              <>
+                <ColorInput
+                  label="Accent color"
+                  value={c.accentColor}
+                  onChange={(v) => set("accentColor", v)}
+                />
+                <Range
+                  label="Accent frequency"
+                  value={c.accentAmount * 100}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  onChange={(v) => set("accentAmount", v / 100)}
+                />
+              </>
+            )}
+          </>
+        )}
+        {c.effect === "beads" && (
+          <>
+            <Select
+              label="Trace from"
+              value={c.contourSource}
+              onChange={(v) => set("contourSource", v)}
+            >
+              <option value="luminance">Brightness contours</option>
+              <option value="alpha">Transparency / mask edge</option>
+            </Select>
+            <Range
+              label="Contour level"
+              value={c.threshold}
+              min={1}
+              max={254}
+              onChange={(v) => set("threshold", v)}
+            />
+            <Range
+              label="Bead spacing"
+              value={c.beadSpacing}
+              min={0.65}
+              max={2.5}
+              step={0.05}
+              onChange={(v) => set("beadSpacing", v)}
+            />
+            <Range
+              label="Bead size"
+              value={c.beadSize}
+              min={0.25}
+              max={1.5}
+              step={0.05}
+              onChange={(v) => set("beadSize", v)}
+            />
+            <Range
+              label="Ring width"
+              value={c.beadRing * 100}
+              min={0}
+              max={60}
+              unit="%"
+              onChange={(v) => set("beadRing", v / 100)}
+            />
+            <ColorInput
+              label="Ring color"
+              value={c.accentColor}
+              onChange={(v) => set("accentColor", v)}
+            />
+            <Check
+              label="Fill contour interior"
+              value={c.contourFill}
+              onChange={(v) => set("contourFill", v)}
+            />
+            {c.contourFill && (
+              <ColorInput
+                label="Interior color"
+                value={c.fillColor}
+                onChange={(v) => set("fillColor", v)}
+              />
+            )}
+          </>
         )}
         {c.effect === "crosshatch" && (
           <Range
@@ -285,10 +551,20 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
                 onChange={(v) => set("dynamic", v)}
               />
               <Check
-                label="Show source underneath"
+                label="Fill beneath type"
                 value={c.underlay}
                 onChange={(v) => set("underlay", v)}
               />
+              {c.underlay && (
+                <Select
+                  label="Type backdrop"
+                  value={c.underlayMode}
+                  onChange={(v) => set("underlayMode", v)}
+                >
+                  <option value="source">Source color</option>
+                  <option value="palette">Flat palette colors</option>
+                </Select>
+              )}
             </>
           )}
           <Select label="Font" value={c.font} onChange={(v) => set("font", v)}>
@@ -321,6 +597,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
               <option value="palette">Effect palette</option>
               <option value="source">Source color</option>
               <option value="foreground">Foreground color</option>
+              <option value="contrast">Automatic contrast</option>
             </Select>
           )}
         </section>
@@ -331,7 +608,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
 export function ColorControls({ config: c, set }) {
   return (
     <>
-      {["dither", "dither-ascii", "ascii", "palette"].includes(c.effect) && (
+      {usesPalette(c) && (
         <section className="inspector-section">
           <div className="section-heading">
             <h2>Color palette</h2>

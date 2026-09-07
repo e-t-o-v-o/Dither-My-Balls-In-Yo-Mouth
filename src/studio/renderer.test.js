@@ -50,6 +50,9 @@ test.each([
   "channel",
   "halftone",
   "crosshatch",
+  "beads",
+  "mosaic",
+  "symbols",
 ])("%s raster and SVG preserve the same image", async (effect) => {
   const c = { ...defaults, effect, cellSize: 40 };
   const raster = createCanvas(192, 108),
@@ -119,4 +122,45 @@ test("SVG escapes user text while retaining vector geometry", () => {
   ctx.fillText("<&", 2, 4);
   expect(ctx.serialize()).toContain("&lt;&amp;");
   expect(ctx.serialize()).toContain("<rect");
+});
+test("an excluded mask keeps the original raster and embedded SVG backdrop", async () => {
+  const input = createCanvas(40, 40);
+  input.getContext("2d").fillStyle = "#2040cc";
+  input.getContext("2d").fillRect(0, 0, 40, 40);
+  const c = {
+    ...defaults,
+    effect: "symbols",
+    maskMode: "color",
+    maskColor: "#ff0000",
+    maskTolerance: 0.01,
+    maskSoftness: 0,
+    maskBackdrop: true,
+  };
+  const canvas = createCanvas(40, 40),
+    svg = new SVGContext(40, 40);
+  new FrameRenderer().render(input, canvas, c, 40, 40);
+  expect(
+    Array.from(canvas.getContext("2d").getImageData(20, 20, 1, 1).data),
+  ).toEqual([32, 64, 204, 255]);
+  new FrameRenderer().render(input, createCanvas(40, 40), c, 40, 40, svg);
+  // Skia's SVG loader omits embedded images; inspect the embedded PNG itself.
+  // The complete SVG composition is also checked in the browser.
+  const embedded=svg.serialize().match(/xlink:href="data:image\/png;base64,([^"]+)"/);
+  expect(embedded).not.toBeNull();
+  const decoded = await loadImage(Buffer.from(embedded[1], "base64"));
+  canvas.getContext("2d").drawImage(decoded, 0, 0);
+  expect(
+    Array.from(canvas.getContext("2d").getImageData(20, 20, 1, 1).data),
+  ).toEqual([32, 64, 204, 255]);
+});
+test("symbol accents are repeatable and do not leave pixels from the previous frame", () => {
+  const input = source(),
+    canvas = createCanvas(192, 108),
+    renderer = new FrameRenderer(),
+    c = { ...defaults, effect: "symbols", shapeColor: "ink", cellSize: 40 };
+  renderer.render(input, canvas, c, 192, 108);
+  const first = canvas.toBuffer("image/png");
+  renderer.render(input, canvas, { ...c, effect: "mosaic" }, 192, 108);
+  renderer.render(input, canvas, c, 192, 108);
+  expect(canvas.toBuffer("image/png")).toEqual(first);
 });
