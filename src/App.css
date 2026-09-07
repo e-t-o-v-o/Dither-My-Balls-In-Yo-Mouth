@@ -1399,3 +1399,21 @@ select {
     transition: none !important;
   }
 }
+
+/* Keep transport and trim controls within reach on shorter displays. */
+.viewer {
+  flex: none;
+}
+.editing-area {
+  --preview-height: clamp(220px, calc(100dvh - 650px), 540px);
+}
+.canvas-wrap {
+  width: min(100%, calc(var(--preview-height) * var(--media-aspect, 1.7778)));
+  max-height: var(--preview-height);
+  flex-shrink: 0;
+}
+@media (max-width: 900px) {
+  .editing-area {
+    --preview-height: clamp(220px, 42dvh, 460px);
+  }
+}

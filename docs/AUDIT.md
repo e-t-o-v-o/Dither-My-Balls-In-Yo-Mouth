@@ -40,7 +40,7 @@ Audited against main commit `ea7a435ce8215e5f0e1d818af5e2a68a124cec8e`. Scope: a
 
 ## Validation evidence
 
-- **55 automated tests pass across 7 suites.** They cover all 13 effects; distinct diffusion patterns; RGB nearest matching; transparency; chroma keying; legacy state migration; corrupted storage; prototype-like enum values; preset imports; portrait/square/native sizing; decoded seeks; cancellation; decode failure; URL/track cleanup; monitor/export audio separation; codec detection; correct file extensions; GIF budgeting; recorder cancellation/setup failure; initial workspace; undo/redo; presets; trim bounds; and export UI.
+- **56 automated tests pass across 7 suites.** They cover all 13 effects; distinct diffusion patterns; RGB nearest matching; transparency; chroma keying; legacy state migration; corrupted storage; prototype-like enum values; preset imports; portrait/square/native sizing; decoded seeks; cancellation; decode failure; URL/track cleanup; monitor/export audio separation; codec detection; correct file extensions; GIF budgeting; recorder cancellation/setup failure; initial workspace; undo/redo; presets; trim bounds; and export UI.
 - A real streaming WebM fixture verifies duration metadata repair. The pending original PR #1 was also reviewed; its missing green-replacement default is resolved by the unified background/keying controls.
 - The actual shipped `gif.worker.js` runs inside a Node VM in `scripts/check-gif-worker.cjs`, producing a GIF89a stream with expected dimensions and a valid trailer.
 - Production build succeeds with Vite. Static entrypoint and local worker assets are verified. The main compressed JavaScript payload is approximately 82 KB, with GIF orchestration loaded on demand.
@@ -51,7 +51,9 @@ Audited against main commit `ea7a435ce8215e5f0e1d818af5e2a68a124cec8e`. Scope: a
 
 Automated DOM tests use jsdom and mocked canvas/media platform APIs. They prove control flow and domain behavior, not a real browser's decoder, camera, encoder, audio synchronization, touch behavior, or rendering speed. The GIF smoke check exercises the real encoder, but does not emulate the browser's Worker transport.
 
-No browser session or physical iPad was used in this task. Before labeling the app as verified on a specific device/browser, run these checks there:
+Final cloud Chromium review exercised the desktop editor and an 820 × 1180 portrait iframe, including the tablet inspector. The preview now reserves space for playback and trim controls on shorter desktop screens. A generated 640 × 360 H.264/AAC test clip opened successfully. A two-second trimmed MP4 export downloaded and decoded in FFmpeg, with audible Opus audio (mean level −21.1 dB). The browser selected VP9 inside MP4; container support alone does not imply H.264 compatibility. The final codec preference now explicitly tries H.264/AAC before the generic MP4 fallback. Cloud recording throughput was low (about 4 rendered fps), and the app displayed its performance warning; this run does not establish smooth playback or audio/video synchronization on target devices. The native output lasted about 2.18 seconds. A GIF exported through the actual browser worker and downloaded correctly: 480 × 270, 24 frames, 1.92 seconds (GIF centisecond delay rounding).
+
+No physical iPad was available. Before labeling the app as verified on a specific device/browser, run these additional checks there:
 
 1. Import landscape and portrait H.264 MP4 clips with audio. Scrub, loop, switch sources, and compare the original frame with the effect.
 2. Export a 3–5 second trim with audio; play the resulting MP4/WebM in a separate player and check duration, sound, frame pacing, and aspect ratio.

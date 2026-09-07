@@ -20,6 +20,12 @@ test("only supported formats are offered", () => {
   ]);
   expect(recordingFormats(null)).toEqual([]);
 });
+test("MP4 prefers H.264/AAC when supported and falls back to the native encoder", () => {
+  expect(recordingFormats({ isTypeSupported: () => true })[0].mime)
+    .toBe("video/mp4;codecs=avc1,mp4a.40.2");
+  expect(recordingFormats({ isTypeSupported: (mime) => mime === "video/mp4" }))
+    .toEqual([{ id: "mp4", mime: "video/mp4", label: "MP4" }]);
+});
 test("the extension follows the actual container, never a requested label", () => {
   expect(mimeExtension("video/webm;codecs=vp8")).toBe("webm");
   expect(mimeExtension("video/mp4")).toBe("mp4");

@@ -15,7 +15,9 @@
     "prebuild": "node scripts/copy-export-assets.cjs",
     "test": "vitest",
     "test:ci": "vitest run",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "dev": "vite",
+    "predev": "node scripts/copy-export-assets.cjs"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",

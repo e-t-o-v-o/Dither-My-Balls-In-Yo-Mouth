@@ -843,7 +843,10 @@ function App() {
           <div className="viewer">
             <div
               className="canvas-wrap"
-              style={{ aspectRatio: `${source.width}/${source.height}` }}
+              style={{
+                aspectRatio: `${source.width}/${source.height}`,
+                "--media-aspect": source.width / source.height,
+              }}
             >
               <canvas ref={canvasRef} aria-label="Processed media preview" />
               {compare && (

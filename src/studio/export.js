@@ -6,7 +6,7 @@ export function recordingFormats(
 ) {
   if (!recorder?.isTypeSupported) return [];
   return [
-    ["mp4", ["video/mp4", "video/mp4;codecs=avc1,mp4a.40.2"]],
+    ["mp4", ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4"]],
     [
       "webm",
       [
