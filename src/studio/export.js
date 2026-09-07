@@ -123,6 +123,7 @@ export async function recordVideo({
       height,
       null,
       time,
+      true,
     );
   render(start);
   checkAbort(signal);
@@ -368,11 +369,12 @@ export async function exportGIF({
       renderer.render(
         sourceFrame(source, time, signalCanvas),
         canvas,
-        { ...config, transparent: false },
+        config,
         width,
         height,
         null,
         time,
+        true,
       );
       gif.addFrame(canvas, {
         copy: true,

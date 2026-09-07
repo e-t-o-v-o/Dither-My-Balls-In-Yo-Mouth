@@ -1,13 +1,13 @@
 # Dither — by etovo
 
-A local video, image, and webcam effects studio. The v2.2 studio rebuilds the original camera-effects prototype around video editing and export, with a desktop workspace and a touch layout for iPad.
+A local video, image, and webcam effects studio. The v2.3 studio rebuilds the original camera-effects prototype around video editing and export, with a desktop workspace and a touch layout for iPad.
 
 ## Use the studio
 
 1. Open a video or image, enable the camera, or experiment with the built-in moving test signal.
 2. Pick a starting look. Adjust **Effects** and **Color**, then use **Before / after** to compare.
-3. Scrub the timeline. Set **In** and **Out** in seconds, or use **Set here** at the playhead.
-4. Choose **Export**, select the format and resolution, and create the file. A completed export stays available behind a Download button, including on iPad.
+3. Scrub the timeline. Set **In** and **Out** in seconds, or use **Set here** at the playhead. The highlighted range shows the export selection; **Full clip** resets it. Arrow keys seek 0.1 seconds (Shift: 1 second), and **I / O** set the trim.
+4. Choose **Export**, select the format and resolution, and create the file. A completed export stays available behind a Download button, including on iPad. It is labeled as a previous export when relevant edits change. Video export preferences are remembered.
 
 The app never uploads your media. Settings and named presets are stored locally, with validated JSON import/export for backups. Original media is unchanged. Imported fonts are session-local and embedded in vector exports.
 
@@ -16,7 +16,7 @@ The app never uploads your media. Settings and named presets are stored locally,
 - Six distinct color-aware dithering methods: Bayer, Floyd–Steinberg, Atkinson, Jarvis–Judice–Ninke, Burkes, and Sierra.
 - Thirteen focused effects: Contour beads, Dot mosaic, Symbol field, Dither, ASCII, Dither + ASCII, Palette, Threshold, Halftone, Crosshatch, Edges, Channel study, and Pixelate. Binary, number, and character treatments are overlays; letter palettes are ASCII ramps. Existing presets migrate automatically. Graphic and Digital families keep the picker compact.
 - Twelve style starters with real rendered previews, three new palettes, palette-backed letterpress type, and reusable brightness/color masks. Masks can isolate a selection or keep the original image behind it; they do not perform automatic subject detection.
-- Original palette and character-set collections, plus four concise default palettes and six starting looks.
+- Original palette and character-set collections. **Keep mask when changing styles** lets you try looks without losing a tuned selection.
 - Brightness, contrast, saturation, inversion, transparency, chroma keying, and temporal smoothing.
 - Video playback, scrubbing, looping, trim controls, audio monitoring, and undo/redo of effect settings.
 - Separate preview and export resolutions; 4K landscape and equivalent portrait exports preserve aspect ratio.
@@ -72,6 +72,7 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 - `src/studio/model.js`: settings validation, legacy migration, palettes, dimensions, and formatting.
 - `src/studio/pixels.js`: pure pixel adjustments, six dithering kernels, and edge detection.
 - `src/studio/renderer.js`: shared canvas/vector rendering and the built-in test signal.
+- `src/studio/workflow.js`: style-mask preservation, validated video preferences, export freshness, and media clocks.
 - `src/studio/media.js`: decode/seek lifecycle, cancellation, camera cleanup, and audio routing.
 - `src/studio/export.js`: image/vector output, GIF sequencing, and native recorder lifecycle.
 - `src/studio/precise-export.js`: lazy-loaded Mediabunny/WebCodecs decoding, timestamped export, codec checks, cancellation, and audio trim.
@@ -83,3 +84,5 @@ See [the performance and quality review](docs/PERFORMANCE.md) for measured gains
 See [the complete audit](docs/AUDIT.md) for the original defects, corresponding repairs, test evidence, and verification limits.
 
 See [Graphic styles review](docs/GRAPHIC-STYLES.md) for the v2.2 reference-inspired styles, rendering measurements, and validation. Regenerate style thumbnails with `npm run previews` after changing a bundled look.
+
+See [Workflow review](docs/WORKFLOW-REVIEW.md) for v2.3 editing refinements and compositing fixes.

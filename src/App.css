@@ -1758,3 +1758,34 @@ select {
   border-radius: 50%;
   background: var(--accent);
 }
+
+.selection-track {
+  position: relative;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+.selection-track span {
+  position: absolute;
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+}
+.style-options {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  margin: -4px 0 8px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.style-options input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}

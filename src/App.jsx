@@ -22,6 +22,12 @@ import {
   usesPalette,
 } from "./studio/model";
 import { exportPrecise, hasPreciseExport } from "./studio/precise-export";
+import {
+  applyStyle,
+  videoPreferences,
+  exportKey,
+  renderClock,
+} from "./studio/workflow";
 import { FrameRenderer, drawSignal } from "./studio/renderer";
 import {
   loadFile,
@@ -193,7 +199,8 @@ function App() {
       ? "Source color"
       : "Custom ink";
   const [source, setSource] = useState(demo),
-    sourceRef = useRef(source);
+    sourceRef = useRef(source),
+    sourceVersion = useRef(0);
   const [playing, setPlaying] = useState(false),
     [time, setTime] = useState(0),
     timeRef = useRef(0),
@@ -201,6 +208,7 @@ function App() {
     trimRef = useRef(trim);
   const [tab, setTab] = useState("effects"),
     [allStyles, setAllStyles] = useState(false),
+    [keepMask, setKeepMask] = useState(false),
     [compare, setCompare] = useState(false),
     [split, setSplit] = useState(50),
     [previewSize, setPreviewSize] = useState("960");
@@ -210,12 +218,20 @@ function App() {
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(0),
     [result, setResult] = useState(null);
+  const [exportDefaults] = useState(() =>
+    videoPreferences(readStorage("dither.video.v1", null)),
+  );
+  const videoSettings = useRef(exportDefaults);
   const [format, setFormat] = useState("auto"),
-    [resolution, setResolution] = useState("1920"),
-    [fps, setFps] = useState(30),
-    [includeAudio, setIncludeAudio] = useState(true),
+    [resolution, setResolution] = useState(exportDefaults.resolution),
+    [fps, setFps] = useState(
+      hasPreciseExport()
+        ? exportDefaults.fps
+        : Math.min(30, exportDefaults.fps),
+    ),
+    [includeAudio, setIncludeAudio] = useState(exportDefaults.includeAudio),
     [engine, setEngine] = useState(hasPreciseExport() ? "precise" : "live"),
-    [quality, setQuality] = useState("high"),
+    [quality, setQuality] = useState(exportDefaults.quality),
     [muted, setMuted] = useState(true),
     [loop, setLoop] = useState(true);
   const [presetName, setPresetName] = useState(""),
@@ -260,12 +276,25 @@ function App() {
     writeStorage("dither.theme.v2", theme);
   }, [theme]);
   useEffect(() => {
-    const timer = setTimeout(
-      () => writeStorage("dither.config.v2", config),
-      250,
-    );
-    return () => clearTimeout(timer);
+    const persist = () => writeStorage("dither.config.v2", config);
+    const timer = setTimeout(persist, 250);
+    window.addEventListener("pagehide", persist);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pagehide", persist);
+    };
   }, [config]);
+  useEffect(() => {
+    if (source.kind !== "camera" && ["auto", "mp4", "webm"].includes(format)) {
+      videoSettings.current = videoPreferences({
+        resolution,
+        fps,
+        includeAudio,
+        quality,
+      });
+      writeStorage("dither.video.v1", videoSettings.current);
+    }
+  }, [format, resolution, fps, includeAudio, quality, source.kind]);
   useEffect(() => {
     const loadedFonts = fontFaces.current;
     mounted.current = true;
@@ -349,7 +378,7 @@ function App() {
               size.width,
               size.height,
               null,
-              t,
+              renderClock(source.kind, t, now),
             );
             const original = originalRef.current;
             if (original) {
@@ -396,8 +425,16 @@ function App() {
   ]);
   const adopt = (next) => {
     setPlaying(false);
+    if (next.kind === "camera") setFps((value) => Math.min(30, value));
+    else if (sourceRef.current.kind === "camera")
+      setFps(
+        hasPreciseExport() && engine === "precise"
+          ? videoSettings.current.fps
+          : Math.min(30, videoSettings.current.fps),
+      );
     audioRef.current?.disconnect();
     releaseSource(sourceRef.current);
+    sourceVersion.current += 1;
     sourceRef.current = next;
     setSource(next);
     timeRef.current = 0;
@@ -519,17 +556,19 @@ function App() {
       alert(e.message, true);
     }
   }, [busy, loading, source, playing, trim, muted, alert]);
-  const scrub = async (value) => {
+  const scrub = (value) => {
+    if (busy || loading || ["image", "camera"].includes(source.kind)) return;
+    value = Math.max(0, Math.min(source.duration, value));
     source.element?.pause?.();
     setPlaying(false);
     timeRef.current = value;
     setTime(value);
     if (source.kind === "video") {
+      source.element.onseeked = resetFrame;
       source.element.currentTime = Math.min(
         value,
         Math.max(0, source.duration - 0.001),
       );
-      source.element.onseeked = resetFrame;
     }
     resetFrame();
   };
@@ -568,7 +607,14 @@ function App() {
   };
   useEffect(() => {
     const handler = (e) => {
-      if (e.target.closest?.("input,select,textarea,button,dialog") || dialog)
+      if (
+        e.target.closest?.(
+          'input,select,textarea,button,dialog,[contenteditable]:not([contenteditable="false"])',
+        ) ||
+        dialog ||
+        busy ||
+        loading
+      )
         return;
       const mod = e.metaKey || e.ctrlKey;
       if (e.code === "Space") {
@@ -580,11 +626,26 @@ function App() {
       } else if (mod && e.key.toLowerCase() === "o") {
         e.preventDefault();
         fileInput.current?.click();
+      } else if (
+        !mod &&
+        !e.altKey &&
+        !["image", "camera"].includes(source.kind)
+      ) {
+        if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
+          e.preventDefault();
+          scrub(
+            timeRef.current +
+              (e.key === "ArrowRight" ? 1 : -1) * (e.shiftKey ? 1 : 0.1),
+          );
+        } else if (["i", "o"].includes(e.key.toLowerCase())) {
+          e.preventDefault();
+          changeTrim(e.key.toLowerCase() === "i" ? 0 : 1, timeRef.current);
+        }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [togglePlay, dialog]);
+  }, [togglePlay, dialog, busy, loading, source, trim]);
   const savePreset = () => {
     const name = presetName.trim().slice(0, 60);
     if (!name) return;
@@ -741,7 +802,7 @@ function App() {
         else
           output = await recordVideo({
             ...options,
-            config: { ...c, transparent: false },
+            config: c,
             audioStream,
             format: choice,
           });
@@ -750,7 +811,29 @@ function App() {
       if (resultURL.current) URL.revokeObjectURL(resultURL.current);
       const url = URL.createObjectURL(output.blob);
       resultURL.current = url;
-      setResult({ ...output, url, name: filename(s.name, output.extension) });
+      setResult({
+        ...output,
+        url,
+        name: filename(s.name, output.extension),
+        sourceVersion: sourceVersion.current,
+        key: exportKey({
+          config: c,
+          format,
+          resolution,
+          fps,
+          includeAudio,
+          quality,
+          engine: usePrecise ? "precise" : "live",
+          time: at,
+          start: trim[0],
+          end: trim[1],
+          fontFace: fontFaces.current[c.font]?.css || "",
+        }),
+        effectName: effects.find(([id]) => id === c.effect)?.[1],
+        selection: still
+          ? `Frame at ${timeLabel(at)}`
+          : `${timeLabel(trim[0])} – ${timeLabel(trim[1])}`,
+      });
       setProgress(1);
     } catch (e) {
       if (e.name === "AbortError")
@@ -767,6 +850,7 @@ function App() {
           await seek(s.element, at);
         } catch {}
       timeRef.current = at;
+      setTime(at);
       resetFrame();
       if (mounted.current) setBusy(false);
       abortRef.current = null;
@@ -780,6 +864,22 @@ function App() {
       : resolution,
     !["png", "svg", "gif"].includes(format),
   );
+  const resultCurrent =
+    result?.sourceVersion === sourceVersion.current &&
+    result?.key ===
+      exportKey({
+        config,
+        format,
+        resolution,
+        fps,
+        includeAudio,
+        quality,
+        engine: usePrecise ? "precise" : "live",
+        time,
+        start: trim[0],
+        end: trim[1],
+        fontFace: fontFaces.current[config.font]?.css || "",
+      });
   return (
     <div
       className="studio"
@@ -1032,6 +1132,16 @@ function App() {
                   <span key={n}>{timeLabel(source.duration * n)}</span>
                 ))}
               </div>
+              {!["image", "camera"].includes(source.kind) && (
+                <div className="selection-track" aria-hidden="true">
+                  <span
+                    style={{
+                      left: `${(100 * trim[0]) / source.duration}%`,
+                      width: `${(100 * (trim[1] - trim[0])) / source.duration}%`,
+                    }}
+                  />
+                </div>
+              )}
               <input
                 aria-label="Video playhead"
                 type="range"
@@ -1103,6 +1213,17 @@ function App() {
                 <span className="duration mono">
                   {(trim[1] - trim[0]).toFixed(1)} s
                 </span>
+                {source.kind !== "camera" && (
+                  <button
+                    className="small"
+                    disabled={
+                      busy || (trim[0] === 0 && trim[1] === source.duration)
+                    }
+                    onClick={() => setTrim([0, source.duration])}
+                  >
+                    Full clip
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1117,6 +1238,17 @@ function App() {
                 {allStyles ? "Show featured" : `All ${looks.length} styles`}
               </button>
             </div>
+            {config.maskMode !== "none" && (
+              <label className="style-options">
+                <input
+                  type="checkbox"
+                  checked={keepMask}
+                  onChange={(e) => setKeepMask(e.target.checked)}
+                  disabled={busy}
+                />
+                Keep mask when changing styles
+              </label>
+            )}
             <div className="looks">
               {(allStyles ? looks : looks.slice(0, 6)).map((look) => (
                 <button
@@ -1126,7 +1258,9 @@ function App() {
                     (key) => look.config[key] === config[key],
                   )}
                   onClick={() => {
-                    dispatch({ config: look.config });
+                    dispatch({
+                      config: applyStyle(look.config, config, keepMask),
+                    });
                     setSelectedPreset("");
                     setTab("effects");
                   }}
@@ -1403,7 +1537,10 @@ function App() {
               <kbd>Space</kbd> Play / pause <br />
               <kbd>⌘ / Ctrl O</kbd> Open media <br />
               <kbd>⌘ / Ctrl Z</kbd> Undo <br />
-              <kbd>⌘ / Ctrl Shift Z</kbd> Redo
+              <kbd>⌘ / Ctrl Shift Z</kbd> Redo <br />
+              <kbd>← / →</kbd> Seek 0.1 seconds <br />
+              <kbd>Shift ← / →</kbd> Seek 1 second <br />
+              <kbd>I / O</kbd> Set trim in / out
             </p>
           </div>
         </Dialog>
@@ -1438,9 +1575,18 @@ function App() {
                       setFps(12);
                       setResolution("480");
                     } else {
-                      if (fps < 24) setFps(30);
-                      if (["480", "720"].includes(resolution))
-                        setResolution("1920");
+                      if (
+                        format === "gif" ||
+                        (["png", "svg"].includes(format) &&
+                          ["auto", "mp4", "webm"].includes(v))
+                      ) {
+                        setFps(
+                          usePrecise
+                            ? videoSettings.current.fps
+                            : Math.min(30, videoSettings.current.fps),
+                        );
+                        setResolution(videoSettings.current.resolution);
+                      }
                     }
                   }}
                 >
@@ -1603,12 +1749,23 @@ function App() {
             )}
             {result && !busy && (
               <div className="export-result">
-                <span className="eyebrow">READY TO SAVE</span>
+                <span className="eyebrow">
+                  {resultCurrent ? "READY TO SAVE" : "PREVIOUS EXPORT"}
+                </span>
                 <strong>{result.name}</strong>
+                <span>
+                  {result.effectName} · {result.selection}
+                </span>
                 <span>
                   {result.width} × {result.height} ·{" "}
                   {(result.blob.size / 1024 / 1024).toFixed(2)} MB
                 </span>
+                {!resultCurrent && (
+                  <p className="hint">
+                    Your edits or export settings have changed. Create a new
+                    export to apply them.
+                  </p>
+                )}
                 {result.engine === "precise" && (
                   <p className="hint">
                     {result.targetFps} fps · {result.codec.toUpperCase()} ·
@@ -1628,7 +1785,8 @@ function App() {
                   download={result.name}
                 >
                   <Icon name="download" />
-                  Download {result.extension.toUpperCase()}
+                  Download {resultCurrent ? "" : "previous "}
+                  {result.extension.toUpperCase()}
                 </a>
                 {navigator.canShare && (
                   <button
