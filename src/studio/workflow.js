@@ -7,6 +7,8 @@ const maskKeys = [
   "maskSoftness",
   "maskInvert",
   "maskBackdrop",
+  "maskStrokes",
+  "maskImage",
 ];
 export function applyStyle(style, current, keepMask = false) {
   return keepMask && current.maskMode !== "none"

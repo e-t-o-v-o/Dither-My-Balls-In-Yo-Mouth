@@ -140,9 +140,16 @@ try {
   };
   const results = [];
   for (const format of ["mp4", "webm"]) {
-    const config = looks.find(
-      (look) => look.name === (format === "mp4" ? "Cobalt beads" : "Acid dots"),
-    ).config;
+    const config = {
+      ...looks.find(
+        (look) =>
+          look.name === (format === "mp4" ? "Overprint" : "Carbon echoes"),
+      ).config,
+      ...(format === "mp4" ? { cropX: 0.21875, cropWidth: 0.5625 } : {}),
+    };
+    console.log(
+      `Checking ${format}: ${config.effect}, crop ${config.cropWidth}, echoes ${config.echoCount}`,
+    );
     const started = performance.now();
     const output = await exportPrecise({
       source,
@@ -154,6 +161,9 @@ try {
       end: 2.5,
       includeAudio: true,
     });
+    console.log(
+      `Encoded ${format} in ${Math.round(performance.now() - started)} ms`,
+    );
     const file = path.join(dir, "result." + output.extension);
     await writeFile(file, new Uint8Array(await output.blob.arrayBuffer()));
     const probe = JSON.parse(
@@ -174,7 +184,7 @@ try {
     );
     const video = probe.streams.find((s) => s.codec_type === "video"),
       audio = probe.streams.find((s) => s.codec_type === "audio");
-    assert.equal(video.width, 320);
+    assert.equal(video.width, format === "mp4" ? 180 : 320);
     assert.equal(video.height, 180);
     assert.equal(Number(video.nb_read_frames), 60);
     assert.ok(audio, "Source audio is present");

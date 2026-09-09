@@ -13,22 +13,30 @@ import {
   readStorage,
   writeStorage,
   parsePresets,
-  looks,
   palettes,
   effects,
-  dimensions,
   timeLabel,
   filename,
   usesPalette,
 } from "./studio/model";
+import { planVideoExport } from "./studio/export-plan";
 import { exportPrecise, hasPreciseExport } from "./studio/precise-export";
+import { applyStyle, videoPreferences, exportKey } from "./studio/workflow";
+import { usePreview } from "./studio/use-preview";
+import { frameDimensions } from "./studio/framing";
+import { SelectionOverlay } from "./studio/SelectionOverlay";
+import { Dialog } from "./studio/Dialog";
+import { StyleBrowser } from "./studio/StyleBrowser";
+import { Timeline } from "./studio/Timeline";
+import { ProjectDownload } from "./studio/ProjectDownload";
+import { FrameControls } from "./studio/FrameControls";
 import {
-  applyStyle,
-  videoPreferences,
-  exportKey,
-  renderClock,
-} from "./studio/workflow";
-import { FrameRenderer, drawSignal } from "./studio/renderer";
+  createProject,
+  parseProject,
+  autosaveProject,
+  loadAutosave,
+} from "./studio/projects";
+import { drawSignal } from "./studio/renderer";
 import {
   loadFile,
   createVideoElement,
@@ -51,65 +59,7 @@ import {
   Select,
   Check,
 } from "./studio/Controls";
-function historyReducer(state, a) {
-  if (a.type === "undo") {
-    if (!state.past.length) return state;
-    return {
-      past: state.past.slice(0, -1),
-      present: state.past.at(-1),
-      future: [state.present, ...state.future],
-      group: null,
-    };
-  }
-  if (a.type === "redo") {
-    if (!state.future.length) return state;
-    return {
-      past: [...state.past, state.present],
-      present: state.future[0],
-      future: state.future.slice(1),
-      group: null,
-    };
-  }
-  const present = sanitizeConfig(
-    a.config ||
-      (a.type === "effect"
-        ? {
-            ...state.present,
-            effect: a.value,
-            overlay: "none",
-            ...([
-              "ascii",
-              "dither-ascii",
-              "halftone",
-              "mosaic",
-              "symbols",
-              "beads",
-            ].includes(a.value)
-              ? { cellSize: Math.max(14, state.present.cellSize) }
-              : {}),
-            ...(["crosshatch", "symbols"].includes(a.value)
-              ? { fgColor: "#101215", bgColor: "#f1f2e9" }
-              : {}),
-            ...(a.value === "symbols" ? { shapeColor: "ink" } : {}),
-            ...(a.value === "beads"
-              ? {
-                  fgColor: "#103eac",
-                  accentColor: "#60b5de",
-                  bgColor: "#f44913",
-                }
-              : {}),
-          }
-        : { ...state.present, [a.key]: a.value }),
-  );
-  const grouped = a.key && state.group === a.key && Date.now() - state.at < 500;
-  return {
-    past: grouped ? state.past : [...state.past, state.present].slice(-80),
-    present,
-    future: [],
-    group: a.key,
-    at: Date.now(),
-  };
-}
+import { historyReducer } from "./studio/editor-state";
 function initialHistory() {
   const saved = readStorage("dither.config.v2", null);
   let c = saved
@@ -129,7 +79,7 @@ function initialHistory() {
     ].includes(c.font)
   )
     c.font = "monospace";
-  return { past: [], present: c, future: [] };
+  return { past: [], present: c, future: [], effectSettings: {}, trim: [0, 8] };
 }
 function initialPresets() {
   try {
@@ -147,41 +97,6 @@ const demo = () => ({
   height: 720,
   duration: 8,
 });
-function Dialog({ title, onClose, busy = false, children }) {
-  const ref = useRef();
-  useEffect(() => {
-    const el = ref.current;
-    el.showModal();
-    return () => el.close();
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      aria-label={title}
-      className="modal"
-      onCancel={(e) => {
-        e.preventDefault();
-        if (!busy) onClose();
-      }}
-      onClick={(e) => {
-        if (e.target === ref.current && !busy) onClose();
-      }}
-    >
-      <div className="modal-head">
-        <h2>{title}</h2>
-        <button
-          className="icon-button"
-          aria-label="Close dialog"
-          onClick={onClose}
-          disabled={busy}
-        >
-          <Icon name="close" />
-        </button>
-      </div>
-      {children}
-    </dialog>
-  );
-}
 function App() {
   const [history, dispatch] = useReducer(
       historyReducer,
@@ -190,34 +105,47 @@ function App() {
     ),
     config = history.present;
   const paletteEffect = usesPalette(config);
-  const colorSummary = paletteEffect
-    ? `${palettes[config.palette].length} palette colors`
-    : ["pixel", "channel"].includes(config.effect) ||
-        (config.effect === "ascii" && config.textColor === "source") ||
-        (["mosaic", "symbols"].includes(config.effect) &&
-          config.shapeColor === "source")
-      ? "Source color"
-      : "Custom ink";
+  const colorSummary =
+    config.effect === "screenprint" && config.screenMode === "cmyk"
+      ? "CMYK inks"
+      : paletteEffect
+        ? `${palettes[config.palette].length} palette colors`
+        : ["pixel", "channel"].includes(config.effect) ||
+            (config.effect === "ascii" && config.textColor === "source") ||
+            (["mosaic", "symbols"].includes(config.effect) &&
+              config.shapeColor === "source")
+          ? "Source color"
+          : "Custom ink";
   const [source, setSource] = useState(demo),
     sourceRef = useRef(source),
     sourceVersion = useRef(0);
   const [playing, setPlaying] = useState(false),
     [time, setTime] = useState(0),
     timeRef = useRef(0),
-    [trim, setTrim] = useState([0, 8]),
+    trim = history.trim,
+    setTrim = (value) => dispatch({ type: "trim", value }),
     trimRef = useRef(trim);
   const [tab, setTab] = useState("effects"),
-    [allStyles, setAllStyles] = useState(false),
     [keepMask, setKeepMask] = useState(false),
     [compare, setCompare] = useState(false),
     [split, setSplit] = useState(50),
-    [previewSize, setPreviewSize] = useState("960");
+    [previewSize, setPreviewSize] = useState("auto"),
+    [showMask, setShowMask] = useState(false),
+    [selectionTool, setSelectionTool] = useState("none"),
+    [zoom, setZoom] = useState("fit"),
+    [brushRadius, setBrushRadius] = useState(0.025),
+    [pendingProject, setPendingProject] = useState(null),
+    [savedSession, setSavedSession] = useState(null),
+    [autosaveStatus, setAutosaveStatus] = useState(""),
+    projectInput = useRef();
   const [notice, setNotice] = useState(null),
     [loading, setLoading] = useState(false),
     [dialog, setDialog] = useState(null),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(0),
-    [result, setResult] = useState(null);
+    [result, setResult] = useState(null),
+    [exportPlan, setExportPlan] = useState(null),
+    resultCleanup = useRef();
   const [exportDefaults] = useState(() =>
     videoPreferences(readStorage("dither.video.v1", null)),
   );
@@ -243,13 +171,11 @@ function App() {
       readStorage("dither.theme.v2", "dark"),
     ),
     [revision, setRevision] = useState(0),
-    [dragging, setDragging] = useState(false),
-    [renderFps, setRenderFps] = useState(0);
+    [dragging, setDragging] = useState(false);
   const canvasRef = useRef(),
     originalRef = useRef(),
     fileInput = useRef(),
     rendererRef = useRef(),
-    signalRef = useRef(),
     abortRef = useRef(),
     loadAbort = useRef(),
     audioRef = useRef(),
@@ -299,8 +225,6 @@ function App() {
     const loadedFonts = fontFaces.current;
     mounted.current = true;
     audioRef.current = new AudioRouter();
-    rendererRef.current = new FrameRenderer();
-    signalRef.current = document.createElement("canvas");
     return () => {
       mounted.current = false;
       loadAbort.current?.abort();
@@ -308,6 +232,7 @@ function App() {
       releaseSource(sourceRef.current);
       audioRef.current?.close();
       if (resultURL.current) URL.revokeObjectURL(resultURL.current);
+      resultCleanup.current?.();
       Object.values(loadedFonts).forEach(({ face }) =>
         document.fonts?.delete(face),
       );
@@ -321,98 +246,7 @@ function App() {
     rendererRef.current?.invalidate();
     setRevision((n) => n + 1);
   };
-  useEffect(() => {
-    if (!rendererRef.current || busy) return;
-    rendererRef.current.invalidate();
-    let raf = 0,
-      last = -Infinity,
-      lastUI = 0,
-      lastDecodedTime = -Infinity,
-      count = 0,
-      fpsStart = performance.now(),
-      startClock = performance.now(),
-      startTime = timeRef.current,
-      failed = false;
-    const size = dimensions(source.width, source.height, previewSize);
-    const render = (now) => {
-      if (failed) return;
-      try {
-        let t = timeRef.current;
-        if (source.kind === "video" || source.kind === "camera")
-          t = source.kind === "camera" ? 0 : source.element.currentTime;
-        if (source.kind === "demo" && playing)
-          t = startTime + (now - startClock) / 1000;
-        if (playing && source.kind !== "camera" && t >= trimRef.current[1]) {
-          if (loop) {
-            t = trimRef.current[0];
-            startTime = t;
-            startClock = now;
-            if (source.kind === "video") source.element.currentTime = t;
-            rendererRef.current.invalidate();
-          } else {
-            source.element?.pause?.();
-            setPlaying(false);
-            t = trimRef.current[1];
-          }
-        }
-        timeRef.current = t;
-        if (
-          (now - last >= 1000 / 30 - 0.5 ||
-            (!playing && source.kind !== "camera")) &&
-          (source.kind !== "video" || t !== lastDecodedTime)
-        ) {
-          lastDecodedTime = t;
-          const frame =
-            source.kind === "demo"
-              ? drawSignal(signalRef.current, t)
-              : source.element;
-          if (
-            frame &&
-            ((source.kind !== "video" && source.kind !== "camera") ||
-              frame.readyState >= 2)
-          ) {
-            rendererRef.current.render(
-              frame,
-              canvasRef.current,
-              config,
-              size.width,
-              size.height,
-              null,
-              renderClock(source.kind, t, now),
-            );
-            const original = originalRef.current;
-            if (original) {
-              if (original.width !== size.width) original.width = size.width;
-              if (original.height !== size.height)
-                original.height = size.height;
-              const ctx = original.getContext("2d");
-              ctx.clearRect(0, 0, size.width, size.height);
-              ctx.drawImage(frame, 0, 0, size.width, size.height);
-            }
-            count++;
-          }
-          last = now;
-        }
-        if (now - lastUI > 250) {
-          setTime(t);
-          lastUI = now;
-        }
-        if (now - fpsStart >= 1000) {
-          setRenderFps(Math.round((count * 1000) / (now - fpsStart)));
-          count = 0;
-          fpsStart = now;
-        }
-        if (playing || source.kind === "camera")
-          raf = requestAnimationFrame(render);
-      } catch (e) {
-        failed = true;
-        setPlaying(false);
-        alert(`Preview could not render: ${e.message}`, true);
-      }
-    };
-    render(performance.now());
-    return () => cancelAnimationFrame(raf);
-  }, [
+  const previewStats = usePreview({
     source,
     config,
     playing,
@@ -420,28 +254,200 @@ function App() {
     previewSize,
     revision,
     loop,
-    alert,
     compare,
-  ]);
+    showMask,
+    pickSource: selectionTool === "pick",
+    timeRef,
+    trimRef,
+    rendererRef,
+    canvasRef,
+    originalRef,
+    setTime,
+    setPlaying,
+    alert,
+    fontFaces,
+  });
+  const projectSnapshot = () =>
+    createProject({
+      config,
+      source,
+      trim,
+      time: timeRef.current,
+      effectSettings: history.effectSettings,
+      fonts: fontFaces.current,
+      video: videoSettings.current,
+    });
+  useEffect(() => {
+    loadAutosave()
+      .then(setSavedSession)
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (
+      pendingProject ||
+      busy ||
+      source.kind === "camera" ||
+      (source.kind === "demo" && !history.past.length)
+    )
+      return;
+    const timer = setTimeout(
+      () =>
+        autosaveProject(projectSnapshot())
+          .then(() => setAutosaveStatus("Session saved on this device"))
+          .catch(() =>
+            setAutosaveStatus("Save a project file to keep this session"),
+          ),
+      1200,
+    );
+    return () => clearTimeout(timer);
+  }, [config, trim, source, customFonts, pendingProject, busy]);
+  const applyProject = async (project, media) => {
+    for (const font of project.fonts) {
+      const buffer = await (await fetch(font.data)).arrayBuffer();
+      const face = new FontFace(font.name, buffer);
+      await face.load();
+      document.fonts.add(face);
+      fontFaces.current[font.name] = {
+        face,
+        data: font.data,
+        css: `@font-face {font-family:"${font.name}";src:url("${font.data}");}`,
+        worker: { key: `${font.name}-${Date.now()}`, name: font.name, buffer },
+      };
+      setCustomFonts((v) => [...new Set([...v, font.name])]);
+    }
+    adopt(media);
+    const duration = media.duration || 8,
+      start = Math.min(project.trim[0], Math.max(0, duration - 0.05)),
+      end = Math.max(start + 0.05, Math.min(duration, project.trim[1]));
+    dispatch({
+      type: "project",
+      config: project.config,
+      trim: [start, end],
+      effectSettings: project.effectSettings,
+    });
+    const at = Math.min(end, Math.max(start, project.time));
+    if (media.kind === "video") await seek(media.element, at);
+    timeRef.current = at;
+    setTime(at);
+    setPendingProject(null);
+    setDialog(null);
+    setResolution(project.video.resolution);
+    setFps(project.video.fps);
+    setQuality(project.video.quality);
+    setIncludeAudio(project.video.includeAudio);
+    setSelectionTool("none");
+    setShowMask(false);
+    resetFrame();
+    alert("Project restored.");
+  };
+  const openProject = async (project) => {
+    const parsed = parseProject(project);
+    if (parsed.media.kind === "demo") await applyProject(parsed, demo());
+    else if (
+      source.file?.name === parsed.media.name &&
+      source.file?.size === parsed.media.size
+    ) {
+      // Keep ownership of the existing media while applying the project.
+      const media = { ...source };
+      await applyProject(parsed, media);
+    } else {
+      setPendingProject(parsed);
+      setDialog(null);
+      setPlaying(false);
+      source.element?.pause?.();
+    }
+  };
+  const importProject = async (event) => {
+    const file = event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      if (file.size > 16 * 1024 * 1024)
+        throw new Error("Project files must be smaller than 16 MB.");
+      await openProject(JSON.parse(await file.text()));
+    } catch (error) {
+      alert(error.message || "This project could not be opened.", true);
+    }
+  };
+  const importMatte = async (event) => {
+    const file = event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const image = await createImageBitmap(file);
+      const scale = Math.min(1, 1536 / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(image.width * scale);
+      canvas.height = Math.round(image.height * scale);
+      canvas
+        .getContext("2d")
+        .drawImage(image, 0, 0, canvas.width, canvas.height);
+      image.close();
+      const data = canvas.toDataURL("image/png");
+      if (data.length >= 4 * 1024 * 1024)
+        throw new Error("Use a simpler matte or a smaller image.");
+      dispatch({ config: { ...config, maskMode: "matte", maskImage: data } });
+      setShowMask(true);
+    } catch (error) {
+      alert(error.message || "This matte could not be opened.", true);
+    }
+  };
+  const pickColor = ([x, y]) => {
+    const frame =
+      source.kind === "demo"
+        ? drawSignal(document.createElement("canvas"), timeRef.current)
+        : source.element;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(
+      frame,
+      (config.cropX + x * config.cropWidth) * source.width,
+      (config.cropY + y * config.cropHeight) * source.height,
+      1,
+      1,
+      0,
+      0,
+      1,
+      1,
+    );
+    const color = Array.from(ctx.getImageData(0, 0, 1, 1).data)
+      .slice(0, 3)
+      .map((v) => v.toString(16).padStart(2, "0"))
+      .join("");
+    dispatch({
+      config: { ...config, maskMode: "color", maskColor: `#${color}` },
+    });
+    setSelectionTool("none");
+    setShowMask(true);
+  };
   const adopt = (next) => {
     setPlaying(false);
     if (next.kind === "camera") setFps((value) => Math.min(30, value));
-    else if (sourceRef.current.kind === "camera")
+    else if (sourceRef.current?.kind === "camera")
       setFps(
         hasPreciseExport() && engine === "precise"
           ? videoSettings.current.fps
           : Math.min(30, videoSettings.current.fps),
       );
     audioRef.current?.disconnect();
-    releaseSource(sourceRef.current);
+    if (sourceRef.current?.element !== next.element)
+      releaseSource(sourceRef.current);
     sourceVersion.current += 1;
     sourceRef.current = next;
     setSource(next);
     timeRef.current = 0;
     setTime(0);
-    setTrim([0, next.duration || 10]);
+    dispatch({ type: "source", trim: [0, next.duration || 10] });
     resetFrame();
-    setNotice(null);
+    setNotice(
+      next.kind === "camera" && config.echoCount
+        ? {
+            text: "Color echoes are paused for live camera. Import a recording to use them.",
+            error: false,
+          }
+        : null,
+    );
   };
   const openFile = async (file) => {
     if (!file || busy) return;
@@ -455,7 +461,8 @@ function App() {
         releaseSource(next);
         return;
       }
-      adopt(next);
+      if (pendingProject) await applyProject(pendingProject, next);
+      else adopt(next);
       if (/\.gif$/i.test(file.name))
         alert(
           "Animated GIF input is treated as an image. For editable motion, import a video.",
@@ -481,7 +488,7 @@ function App() {
     setLoading(true);
     let stream, video;
     try {
-      if (sourceRef.current.kind === "camera") {
+      if (sourceRef.current?.kind === "camera") {
         sourceRef.current.element.srcObject
           ?.getTracks()
           .forEach((t) => t.stop());
@@ -649,13 +656,6 @@ function App() {
   const savePreset = () => {
     const name = presetName.trim().slice(0, 60);
     if (!name) return;
-    if (name in presets) {
-      alert(
-        "That name already exists. Choose a new name to keep both presets.",
-        true,
-      );
-      return;
-    }
     const next = { ...presets, [name]: config };
     if (Object.keys(next).length > 50) {
       alert("You can save up to 50 presets. Delete one first.", true);
@@ -735,6 +735,12 @@ function App() {
       fontFaces.current[name] = {
         face,
         css: `@font-face {font-family:"${name}";src:url("${data}");}`,
+        worker: {
+          key: `${name}-${file.size}-${file.lastModified}`,
+          name,
+          buffer,
+        },
+        data,
       };
       setCustomFonts((v) => [...new Set([...v, name])]);
       set("font", name);
@@ -743,6 +749,56 @@ function App() {
       alert(err.message || "This font could not be loaded.", true);
     }
   };
+  useEffect(() => {
+    if (
+      dialog !== "export" ||
+      !usePrecise ||
+      !["auto", "mp4", "webm"].includes(format)
+    ) {
+      setExportPlan(null);
+      return;
+    }
+    const controller = new AbortController();
+    setExportPlan({ checking: true });
+    const timer = setTimeout(
+      () =>
+        planVideoExport({
+          source,
+          config,
+          resolution,
+          format,
+          fps,
+          start: trim[0],
+          end: trim[1],
+          includeAudio,
+          quality,
+          signal: controller.signal,
+        })
+          .then((plan) => {
+            if (!controller.signal.aborted) setExportPlan(plan);
+          })
+          .catch((error) => {
+            if (!controller.signal.aborted)
+              setExportPlan({ error: error.message });
+          }),
+      250,
+    );
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    dialog,
+    usePrecise,
+    source,
+    config,
+    resolution,
+    format,
+    fps,
+    trim,
+    includeAudio,
+    quality,
+  ]);
   const startExport = async () => {
     if (abortRef.current) return;
     const c = { ...config },
@@ -777,6 +833,7 @@ function App() {
         fps,
         signal: controller.signal,
         onProgress: setProgress,
+        font: fontFaces.current[c.font]?.worker,
       };
       let output;
       if (still)
@@ -807,7 +864,12 @@ function App() {
             format: choice,
           });
       }
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) {
+        await output.cleanup?.();
+        return;
+      }
+      resultCleanup.current?.();
+      resultCleanup.current = output.cleanup;
       if (resultURL.current) URL.revokeObjectURL(resultURL.current);
       const url = URL.createObjectURL(output.blob);
       resultURL.current = url;
@@ -856,9 +918,9 @@ function App() {
       abortRef.current = null;
     }
   };
-  const exportDimensions = dimensions(
-    source.width,
-    source.height,
+  const exportDimensions = frameDimensions(
+    source,
+    config,
     format === "gif"
       ? String(Math.min(720, Number(resolution) || 720))
       : resolution,
@@ -927,6 +989,20 @@ function App() {
           </button>
           <span className="divider" />
           <button
+            disabled={busy || loading}
+            onClick={() => setDialog("project")}
+          >
+            Project
+          </button>
+          <button
+            className="icon-button"
+            title="Change appearance"
+            aria-label="Change appearance"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            {theme === "dark" ? "☼" : "◐"}
+          </button>
+          <button
             className="icon-button"
             aria-label="Help and shortcuts"
             onClick={() => setDialog("help")}
@@ -960,10 +1036,6 @@ function App() {
             <Icon name="upload" />
             {loading ? "Opening…" : "Open media"}
           </button>
-          <button onClick={openCamera} disabled={loading || busy}>
-            <Icon name="camera" />
-            {source.kind === "camera" ? "Switch camera" : "Camera"}
-          </button>
           <button
             className="quiet"
             onClick={() => adopt(demo())}
@@ -974,6 +1046,25 @@ function App() {
         </div>
         <span className="local-label">Files stay on your device</span>
       </div>
+      <input
+        hidden
+        ref={projectInput}
+        type="file"
+        accept=".dither,.json,application/json"
+        onChange={importProject}
+      />
+      {pendingProject && (
+        <div className="notice" role="status">
+          <span>
+            Relink <strong>{pendingProject.media.name}</strong> to restore this
+            project.
+          </span>
+          <button onClick={() => fileInput.current.click()}>
+            Choose media
+          </button>
+          <button onClick={() => setPendingProject(null)}>Cancel</button>
+        </div>
+      )}
       {notice && (
         <div
           role={notice.error ? "alert" : "status"}
@@ -1010,16 +1101,51 @@ function App() {
               Before / after
             </button>
           </div>
-          <div className="viewer">
+          <div className={`viewer ${zoom === "100" ? "zoom-actual" : ""}`}>
+            {selectionTool !== "none" && (
+              <div className="selection-toolbar">
+                <span>
+                  {selectionTool === "pick"
+                    ? "Pick a source color"
+                    : `${selectionTool === "lasso" ? "Lasso" : selectionTool === "erase" ? "Erase" : "Paint"} selection`}
+                </span>
+                <button
+                  className="small"
+                  onClick={() => setSelectionTool("none")}
+                >
+                  Done
+                </button>
+              </div>
+            )}
             <div
               className="canvas-wrap"
               style={{
-                aspectRatio: `${source.width}/${source.height}`,
-                "--media-aspect": source.width / source.height,
+                aspectRatio: `${source.width * config.cropWidth}/${source.height * config.cropHeight}`,
+                "--media-aspect":
+                  (source.width * config.cropWidth) /
+                  (source.height * config.cropHeight),
+                ...(zoom === "100"
+                  ? {
+                      width: previewStats.width,
+                      maxWidth: "none",
+                      maxHeight: "none",
+                      flexShrink: 0,
+                    }
+                  : {}),
               }}
             >
               <canvas ref={canvasRef} aria-label="Processed media preview" />
-              {compare && (
+              {selectionTool !== "none" && (
+                <SelectionOverlay
+                  tool={selectionTool}
+                  config={config}
+                  setConfig={(c) => dispatch({ config: c })}
+                  radius={brushRadius}
+                  onPick={pickColor}
+                  onFinish={() => setShowMask(true)}
+                />
+              )}
+              {compare && selectionTool === "none" && (
                 <>
                   <canvas
                     className="original-canvas"
@@ -1059,220 +1185,71 @@ function App() {
               <span className="muted"> / SOURCE</span>
             </span>
             <div>
+              <select
+                aria-label="Preview zoom"
+                value={zoom}
+                onChange={(event) => setZoom(event.target.value)}
+              >
+                <option value="fit">Fit</option>
+                <option value="100">100%</option>
+              </select>
               <label htmlFor="preview-quality">Preview</label>
               <select
                 id="preview-quality"
                 value={previewSize}
                 onChange={(e) => setPreviewSize(e.target.value)}
               >
+                <option value="auto">Auto · {previewStats.longEdge} px</option>
                 <option value="640">Fast · 640 px</option>
                 <option value="960">Balanced · 960 px</option>
                 <option value="1280">Detailed · 1280 px</option>
               </select>
-              {playing && <span className="mono fps">{renderFps} fps</span>}
-            </div>
-          </div>
-          <div className="timeline">
-            <div className="transport">
-              <div className="transport-buttons">
-                <button
-                  className="icon-button"
-                  aria-label="Back to trim start"
-                  disabled={
-                    busy || source.kind === "image" || source.kind === "camera"
-                  }
-                  onClick={() => scrub(trim[0])}
-                >
-                  <Icon name="back" />
-                </button>
-                <button
-                  className="play-button"
-                  aria-label={playing ? "Pause" : "Play"}
-                  onClick={togglePlay}
-                  disabled={
-                    busy ||
-                    loading ||
-                    source.kind === "image" ||
-                    source.kind === "camera"
-                  }
-                >
-                  <Icon name={playing ? "pause" : "play"} />
-                </button>
-                <span className="timecode">
-                  {timeLabel(time)}
-                  <span> / {timeLabel(source.duration)}</span>
-                </span>
-              </div>
-              <div className="transport-options">
-                {source.kind === "video" && (
-                  <button
-                    className="icon-button"
-                    aria-label={muted ? "Unmute preview" : "Mute preview"}
-                    onClick={toggleSound}
-                    disabled={busy}
-                  >
-                    <Icon name={muted ? "mute" : "sound"} />
-                  </button>
-                )}
-                <button
-                  className={loop ? "small selected" : "small"}
-                  aria-pressed={loop}
-                  onClick={() => setLoop(!loop)}
-                  disabled={
-                    busy || source.kind === "image" || source.kind === "camera"
-                  }
-                >
-                  Loop
-                </button>
-              </div>
-            </div>
-            <div className="scrubber">
-              <div className="timeline-ruler" aria-hidden="true">
-                {[0, 0.25, 0.5, 0.75, 1].map((n) => (
-                  <span key={n}>{timeLabel(source.duration * n)}</span>
-                ))}
-              </div>
-              {!["image", "camera"].includes(source.kind) && (
-                <div className="selection-track" aria-hidden="true">
-                  <span
-                    style={{
-                      left: `${(100 * trim[0]) / source.duration}%`,
-                      width: `${(100 * (trim[1] - trim[0])) / source.duration}%`,
-                    }}
-                  />
-                </div>
+              {playing && (
+                <span className="mono fps">{previewStats.fps} fps</span>
               )}
-              <input
-                aria-label="Video playhead"
-                type="range"
-                min="0"
-                max={source.duration || 1}
-                step="0.01"
-                value={Math.min(time, source.duration || 1)}
-                disabled={
-                  busy || source.kind === "image" || source.kind === "camera"
-                }
-                onChange={(e) => scrub(Number(e.target.value))}
-              />
             </div>
-            {source.kind !== "image" && (
-              <div className="trim-row">
-                <span className="eyebrow">
-                  {source.kind === "camera" ? "RECORD LENGTH" : "EXPORT RANGE"}
-                </span>
-                {source.kind !== "camera" && (
-                  <label>
-                    In
-                    <input
-                      aria-label="Trim start in seconds"
-                      type="number"
-                      min={0}
-                      max={trim[1] - 0.05}
-                      step=".1"
-                      value={Number(trim[0].toFixed(2))}
-                      disabled={busy}
-                      onChange={(e) => changeTrim(0, e.target.value)}
-                    />
-                    <span>s</span>
-                    <button
-                      className="small"
-                      onClick={() => changeTrim(0, time)}
-                      disabled={busy}
-                    >
-                      Set here
-                    </button>
-                  </label>
-                )}
-                <label>
-                  {source.kind === "camera" ? "Length" : "Out"}
-                  <input
-                    aria-label={
-                      source.kind === "camera"
-                        ? "Recording duration in seconds"
-                        : "Trim end in seconds"
-                    }
-                    type="number"
-                    min={trim[0] + 0.05}
-                    max={source.duration || 300}
-                    step=".1"
-                    value={Number(trim[1].toFixed(2))}
-                    disabled={busy}
-                    onChange={(e) => changeTrim(1, e.target.value)}
-                  />
-                  <span>s</span>
-                  {source.kind !== "camera" && (
-                    <button
-                      className="small"
-                      onClick={() => changeTrim(1, time)}
-                      disabled={busy}
-                    >
-                      Set here
-                    </button>
-                  )}
-                </label>
-                <span className="duration mono">
-                  {(trim[1] - trim[0]).toFixed(1)} s
-                </span>
-                {source.kind !== "camera" && (
-                  <button
-                    className="small"
-                    disabled={
-                      busy || (trim[0] === 0 && trim[1] === source.duration)
-                    }
-                    onClick={() => setTrim([0, source.duration])}
-                  >
-                    Full clip
-                  </button>
-                )}
-              </div>
-            )}
           </div>
-          <section className="looks-section">
-            <div className="section-heading">
-              <h2>Style starters</h2>
-              <button
-                className="text-button"
-                onClick={() => setAllStyles((v) => !v)}
-                aria-expanded={allStyles}
-              >
-                {allStyles ? "Show featured" : `All ${looks.length} styles`}
-              </button>
-            </div>
-            {config.maskMode !== "none" && (
-              <label className="style-options">
-                <input
-                  type="checkbox"
-                  checked={keepMask}
-                  onChange={(e) => setKeepMask(e.target.checked)}
-                  disabled={busy}
-                />
-                Keep mask when changing styles
-              </label>
-            )}
-            <div className="looks">
-              {(allStyles ? looks : looks.slice(0, 6)).map((look) => (
-                <button
-                  key={look.name}
-                  className="look"
-                  aria-pressed={Object.keys(look.config).every(
-                    (key) => look.config[key] === config[key],
-                  )}
-                  onClick={() => {
-                    dispatch({
-                      config: applyStyle(look.config, config, keepMask),
-                    });
-                    setSelectedPreset("");
-                    setTab("effects");
-                  }}
-                  disabled={busy}
-                >
-                  <StylePreview look={look} />
-                  <strong>{look.name}</strong>
-                  <span>{look.note}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+          <Timeline
+            source={source}
+            time={time}
+            trim={trim}
+            busy={busy}
+            loading={loading}
+            playing={playing}
+            loop={loop}
+            muted={muted}
+            scrub={scrub}
+            togglePlay={togglePlay}
+            toggleSound={toggleSound}
+            setLoop={setLoop}
+            changeTrim={changeTrim}
+            setTrim={setTrim}
+          />
+          <StyleBrowser
+            config={config}
+            source={source}
+            time={timeRef.current}
+            keepMask={keepMask}
+            setKeepMask={setKeepMask}
+            busy={busy}
+            onApply={(look) => {
+              dispatch({
+                config: {
+                  ...applyStyle(look.config, config, keepMask),
+                  cropX: config.cropX,
+                  cropY: config.cropY,
+                  cropWidth: config.cropWidth,
+                  cropHeight: config.cropHeight,
+                },
+              });
+              setSelectedPreset("");
+              setTab("effects");
+            }}
+            onPause={() => {
+              setPlaying(false);
+              source.element?.pause?.();
+            }}
+          />
         </section>
         <aside className="inspector" aria-label="Effect inspector">
           <div
@@ -1282,7 +1259,8 @@ function App() {
           >
             {[
               ["effects", "Effects"],
-              ["color", "Color"],
+              ["color", "Finish"],
+              ["frame", "Frame"],
               ["mask", "Mask"],
               ["presets", "Presets"],
             ].map(([id, label]) => (
@@ -1301,12 +1279,18 @@ function App() {
                 onKeyDown={(e) => {
                   if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
                     e.preventDefault();
-                    const tabs = ["effects", "color", "mask", "presets"],
+                    const tabs = [
+                        "effects",
+                        "color",
+                        "frame",
+                        "mask",
+                        "presets",
+                      ],
                       next =
                         tabs[
                           (tabs.indexOf(tab) +
-                            (e.key === "ArrowRight" ? 1 : 3)) %
-                            4
+                            (e.key === "ArrowRight" ? 1 : 4)) %
+                            5
                         ];
                     setTab(next);
                     document.getElementById(`tab-${next}`).focus();
@@ -1336,8 +1320,43 @@ function App() {
                   onFontUpload={uploadFont}
                 />
               )}
-              {tab === "color" && <ColorControls config={config} set={set} />}
-              {tab === "mask" && <MaskControls config={config} set={set} />}
+              {tab === "color" && (
+                <ColorControls
+                  config={config}
+                  set={set}
+                  motion={source.kind !== "image"}
+                  echoes={["demo", "video"].includes(source.kind)}
+                />
+              )}
+              {tab === "frame" && (
+                <FrameControls
+                  config={config}
+                  source={source}
+                  setConfig={(c) => dispatch({ config: c })}
+                  trim={trim}
+                  time={time}
+                  changeTrim={changeTrim}
+                  setTrim={setTrim}
+                />
+              )}
+              {tab === "mask" && (
+                <MaskControls
+                  config={config}
+                  set={set}
+                  setConfig={(c) => dispatch({ config: c })}
+                  showMask={showMask}
+                  setShowMask={setShowMask}
+                  tool={selectionTool}
+                  setTool={(tool) => {
+                    setSelectionTool(tool);
+                    setPlaying(false);
+                    source.element?.pause?.();
+                  }}
+                  radius={brushRadius}
+                  setRadius={setBrushRadius}
+                  onMatteUpload={importMatte}
+                />
+              )}
               {tab === "presets" && (
                 <>
                   <section className="inspector-section">
@@ -1368,7 +1387,9 @@ function App() {
                         className="primary full"
                         disabled={!presetName.trim()}
                       >
-                        Save current look
+                        {presetName.trim() in presets
+                          ? "Update saved look"
+                          : "Save current look"}
                       </button>
                     </form>
                     <div className="saved-presets">
@@ -1458,7 +1479,7 @@ function App() {
       </main>
       <footer className="statusbar">
         <span>
-          DITHER STUDIO <b>/</b> 02
+          DITHER STUDIO <b>/</b> 03
         </span>
         <span>Local processing · No uploads</span>
         <span className="keyboard-hint">
@@ -1489,6 +1510,63 @@ function App() {
             >
               Delete preset
             </button>
+          </div>
+        </Dialog>
+      )}
+      {dialog === "project" && (
+        <Dialog title="Project" onClose={() => setDialog(null)}>
+          <div className="modal-body project-dialog">
+            <p>
+              Keep your effect settings, selection, trim, framing, and custom
+              font together. Media stays in its original file.
+            </p>
+            <ProjectDownload project={projectSnapshot()} />
+            <button
+              className="full"
+              onClick={() => projectInput.current.click()}
+            >
+              Open project
+            </button>
+            {savedSession && (
+              <button
+                className="full"
+                onClick={() =>
+                  openProject(savedSession).catch((e) => alert(e.message, true))
+                }
+              >
+                Restore last session · {savedSession.media.name}
+              </button>
+            )}
+            <p className="hint">{autosaveStatus}</p>
+            <details>
+              <summary>Camera & workspace</summary>
+              <button
+                onClick={() => {
+                  setDialog(null);
+                  openCamera();
+                }}
+              >
+                {source.kind === "camera" ? "Switch camera" : "Open camera"}
+              </button>
+              {source.kind === "camera" && (
+                <button
+                  onClick={() => {
+                    adopt(demo());
+                    setDialog(null);
+                  }}
+                >
+                  Stop camera
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  dispatch({ config: defaults });
+                  setDialog(null);
+                }}
+              >
+                Reset effect settings
+              </button>
+            </details>
           </div>
         </Dialog>
       )}
@@ -1711,11 +1789,26 @@ function App() {
                   exports redraw the effect geometry at the selected size.
                 </p>
               )}
+              {exportPlan && (
+                <p
+                  className={
+                    exportPlan.error ? "inline-error" : "export-preflight hint"
+                  }
+                  role="status"
+                >
+                  {exportPlan.checking
+                    ? "Checking video, audio, and available space…"
+                    : exportPlan.error ||
+                      `${exportPlan.extension.toUpperCase()} · ${exportPlan.codec.toUpperCase()} · approximately ${(exportPlan.estimatedBytes / 1024 / 1024).toFixed(1)} MB · ${exportPlan.disk ? "disk-backed export" : "memory checked"}`}
+                </p>
+              )}
               <button
                 className="primary full export-button"
                 onClick={startExport}
                 disabled={
                   busy ||
+                  !!exportPlan?.checking ||
+                  !!exportPlan?.error ||
                   (!["png", "svg", "gif"].includes(format) && !formats.length)
                 }
               >
@@ -1818,19 +1911,6 @@ function App() {
         </Dialog>
       )}
     </div>
-  );
-}
-function StylePreview({ look }) {
-  const slug = look.name.toLowerCase().replace(/\s+/g, "-");
-  return (
-    <img
-      className="style-preview"
-      src={`${import.meta.env.BASE_URL}styles/${slug}.png`}
-      alt=""
-      loading="lazy"
-      width="240"
-      height="144"
-    />
   );
 }
 export default App;

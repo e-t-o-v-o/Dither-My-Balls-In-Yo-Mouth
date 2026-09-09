@@ -1,8 +1,12 @@
 import { palettes } from "./model";
 import { adjust, dither, edge, rgb, luma, nearest } from "./pixels";
-import { applyMask } from "./masks";
+import { SelectionRenderer } from "./selection";
+import { drawSource } from "./framing";
+import { canvasBlob } from "./canvas";
+import { FinishingRenderer } from "./finishing";
+import { screenprint, contourType } from "./print-effects";
 import { GraphicRenderer } from "./graphics";
-const makeCanvas = () => document.createElement("canvas");
+import { makeCanvas } from "./canvas";
 function resize(c, w, h) {
   if (c.width !== w) c.width = w;
   if (c.height !== h) c.height = h;
@@ -60,7 +64,13 @@ export class FrameRenderer {
     this.textLayer = makeCanvas();
     this.graphic = new GraphicRenderer();
     this.backdrop = makeCanvas();
+    this.selection = new SelectionRenderer();
+    this.finishing = new FinishingRenderer(this.selection);
+    this.composition = makeCanvas();
     this.reset = true;
+  }
+  setMatte(matte) {
+    this.selection.setMatte(matte);
   }
   invalidate() {
     this.reset = true;
@@ -75,6 +85,100 @@ export class FrameRenderer {
     overrideContext = null,
     time = source.timestamp ?? null,
     flatten = false,
+    echoFrames = [],
+  ) {
+    if (c.sourcePreview) {
+      resize(canvas, width, height);
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, width, height);
+      drawSource(source, ctx, c, width, height);
+      return canvas;
+    }
+    if (c.maskPreview && c.maskMode !== "none") {
+      resize(canvas, width, height);
+      resize(this.sample, width, height);
+      const sc = this.sample.getContext("2d", { willReadFrequently: true });
+      sc.clearRect(0, 0, width, height);
+      drawSource(source, sc, c, width, height);
+      const image = sc.getImageData(0, 0, width, height),
+        selected = this.selection.apply(image.data, c, width, height);
+      for (let i = 0; i < image.data.length; i += 4) {
+        const mix =
+          (1 - (image.data[i + 3] ? selected[i + 3] / image.data[i + 3] : 0)) *
+          0.65;
+        image.data[i] = image.data[i] * (1 - mix) + 255 * mix;
+        image.data[i + 1] *= 1 - mix;
+        image.data[i + 2] = image.data[i + 2] * (1 - mix) + 110 * mix;
+      }
+      canvas.getContext("2d").putImageData(image, 0, 0);
+      return canvas;
+    }
+    const echoes = echoFrames || [];
+    if (c.effectMix === 1 && !c.grain && !echoes.length)
+      return this.renderCore(
+        source,
+        canvas,
+        c,
+        width,
+        height,
+        overrideContext,
+        time,
+        flatten,
+      );
+    resize(canvas, width, height);
+    const ctx = overrideContext || canvas.getContext("2d");
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, width, height);
+    if (!c.transparent || flatten) {
+      ctx.fillStyle = c.bgColor;
+      ctx.fillRect(0, 0, width, height);
+    }
+    if (c.effectMix < 1 || (c.maskBackdrop && c.maskMode !== "none"))
+      this.finishing.drawOriginal(ctx, source, c, width, height);
+    this.finishing.echoes(ctx, echoes, c, width, height);
+    if (overrideContext) {
+      const layer = new SVGContext(width, height, "");
+      this.renderCore(
+        source,
+        this.composition,
+        c,
+        width,
+        height,
+        layer,
+        time,
+        false,
+        echoes.length > 0,
+      );
+      ctx.append(layer, c.effectMix);
+    } else {
+      this.renderCore(
+        source,
+        this.composition,
+        c,
+        width,
+        height,
+        null,
+        time,
+        false,
+        echoes.length > 0,
+      );
+      ctx.globalAlpha = c.effectMix;
+      ctx.drawImage(this.composition, 0, 0);
+      ctx.globalAlpha = 1;
+    }
+    this.finishing.paper(ctx, c, width, height);
+    return canvas;
+  }
+  renderCore(
+    source,
+    canvas,
+    c,
+    width,
+    height,
+    overrideContext = null,
+    time = source.timestamp ?? null,
+    flatten = false,
+    omitBackground = false,
   ) {
     resize(canvas, width, height);
     const ctx = overrideContext || canvas.getContext("2d");
@@ -93,8 +197,7 @@ export class FrameRenderer {
     sc.clearRect(0, 0, w, h);
     sc.imageSmoothingEnabled = true;
     sc.imageSmoothingQuality = "high";
-    if (typeof source.draw === "function") source.draw(sc, 0, 0, w, h);
-    else sc.drawImage(source, 0, 0, w, h);
+    drawSource(source, sc, c, w, h);
     if (this.accum.width !== w || this.accum.height !== h) {
       resize(this.accum, w, h);
       this.reset = true;
@@ -114,7 +217,10 @@ export class FrameRenderer {
     }
     this.lastTime = time;
     this.reset = false;
-    let data = adjust(applyMask(sc.getImageData(0, 0, w, h).data, c), c);
+    let data = adjust(
+      this.selection.apply(sc.getImageData(0, 0, w, h).data, c, w, h),
+      c,
+    );
     const original = data,
       palHex = palettes[c.palette];
     if (this.palette !== c.palette) {
@@ -128,7 +234,7 @@ export class FrameRenderer {
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, width, height);
     // Flatten the final composition without changing transparent effect semantics.
-    if (!c.transparent || flatten) {
+    if ((!c.transparent || flatten) && !omitBackground) {
       ctx.fillStyle = c.bgColor;
       ctx.fillRect(0, 0, width, height);
     }
@@ -136,10 +242,20 @@ export class FrameRenderer {
       resize(this.backdrop, width, height);
       const bc = this.backdrop.getContext("2d");
       bc.clearRect(0, 0, width, height);
-      if (typeof source.draw === "function")
-        source.draw(bc, 0, 0, width, height);
-      else bc.drawImage(source, 0, 0, width, height);
+      drawSource(source, bc, c, width, height);
       ctx.drawImage(this.backdrop, 0, 0, width, height);
+    }
+    if (c.effect === "screenprint" || c.effect === "contour-type") {
+      (c.effect === "screenprint" ? screenprint : contourType)(
+        ctx,
+        data,
+        w,
+        h,
+        c,
+        width,
+        height,
+      );
+      return canvas;
     }
     if (["beads", "mosaic", "symbols"].includes(c.effect)) {
       this.graphic.render(
@@ -429,7 +545,7 @@ export class FrameRenderer {
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4;
-        if (!data[i + 3]) continue;
+        if (!data[i + 3] && c.effect !== "channel") continue;
         const r = data[i],
           g = data[i + 1],
           b = data[i + 2];
@@ -585,11 +701,18 @@ export class SVGContext {
     this.parts = [];
     this.globalAlpha = 1;
     this.fontFace = fontFace;
+    this.images = [];
+    this.globalCompositeOperation = "source-over";
   }
   clearRect() {}
   fillRect(x, y, w, h) {
     this.parts.push(
       `<rect x="${x.toFixed(3)}" y="${y.toFixed(3)}" width="${w.toFixed(3)}" height="${h.toFixed(3)}" fill="${escape(this.fillStyle)}" opacity="${this.globalAlpha}"/>`,
+    );
+  }
+  fillRotatedText(text, x, y, angle) {
+    this.parts.push(
+      `<text transform="translate(${x} ${y}) rotate(${(angle * 180) / Math.PI})" text-anchor="middle" dominant-baseline="central" style="font:${escape(this.font)}" fill="${escape(this.fillStyle)}" opacity="${this.globalAlpha}">${escape(text)}</text>`,
     );
   }
   fillText(text, x, y) {
@@ -598,8 +721,15 @@ export class SVGContext {
     );
   }
   drawImage(source, x, y, w, h) {
+    let href;
+    if (source.toDataURL) href = source.toDataURL("image/png");
+    else {
+      const copy = makeCanvas(source.width, source.height);
+      copy.getContext("2d").drawImage(source, 0, 0);
+      href = `__IMAGE_${this.images.push(copy) - 1}__`;
+    }
     this.parts.push(
-      `<image x="${x}" y="${y}" width="${w}" height="${h}" xlink:href="${source.toDataURL("image/png")}"/>`,
+      `<image x="${x}" y="${y}" width="${w}" height="${h}" opacity="${this.globalAlpha}" xlink:href="${href}"/>`,
     );
   }
   beginPath() {
@@ -619,7 +749,7 @@ export class SVGContext {
   fill(rule = "nonzero") {
     if (this.path.length)
       this.parts.push(
-        `<path d="${this.path.join(" ")}" fill-rule="${rule}" fill="${escape(this.fillStyle)}" opacity="${this.globalAlpha}"/>`,
+        `<path d="${this.path.join(" ")}" fill-rule="${rule}" style="mix-blend-mode:${this.globalCompositeOperation === "multiply" ? "multiply" : "normal"}" fill="${escape(this.fillStyle)}" opacity="${this.globalAlpha}"/>`,
       );
   }
   moveTo(x, y) {
@@ -633,6 +763,37 @@ export class SVGContext {
       this.parts.push(
         `<path d="${this.path.join(" ")}" fill="none" stroke="${escape(this.strokeStyle)}" stroke-width="${this.lineWidth}" opacity="${this.globalAlpha}"/>`,
       );
+  }
+  append(context, opacity = 1) {
+    const offset = this.images.length;
+    this.images.push(...context.images);
+    const parts = context.parts
+      .join("")
+      .replace(/__IMAGE_(\d+)__/g, (_, n) => `__IMAGE_${Number(n) + offset}__`);
+    this.parts.push(`<g opacity="${opacity}">${parts}</g>`);
+  }
+  beginAlphaGrain() {
+    this.parts = [
+      `<g id="composition">${this.parts.join("")}</g><defs><mask id="grain-alpha" style="mask-type:alpha"><use xlink:href="#composition"/></mask></defs><g mask="url(#grain-alpha)">`,
+    ];
+  }
+  endAlphaGrain() {
+    this.parts.push("</g>");
+  }
+  async serializeAsync() {
+    let xml = this.serialize();
+    for (let i = 0; i < this.images.length; i++) {
+      const blob = await canvasBlob(this.images[i]);
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = "";
+      for (let j = 0; j < bytes.length; j += 8192)
+        binary += String.fromCharCode(...bytes.subarray(j, j + 8192));
+      xml = xml.replaceAll(
+        `__IMAGE_${i}__`,
+        `data:image/png;base64,${btoa(binary)}`,
+      );
+    }
+    return xml;
   }
   serialize() {
     return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${this.width}" height="${this.height}" viewBox="0 0 ${this.width} ${this.height}"><style>${this.fontFace}</style>${this.parts.join("")}</svg>`;

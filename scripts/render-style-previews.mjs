@@ -25,13 +25,30 @@ const { looks } = await bundle(path.resolve("src/studio/model.js"));
 const input = drawSignal(createCanvas(1280, 720), 1.3);
 const dir = path.resolve("public/styles");
 await mkdir(dir, { recursive: true });
-const sheet = createCanvas(960, (looks.length / 4) * 188),
+const sheet = createCanvas(960, Math.ceil(looks.length / 4) * 188),
   sc = sheet.getContext("2d");
 sc.fillStyle = "#161719";
 sc.fillRect(0, 0, sheet.width, sheet.height);
 for (const [i, look] of looks.entries()) {
   const output = createCanvas(480, 288);
-  new FrameRenderer().render(input, output, look.config, 480, 288);
+  const echoes = Array.from({ length: look.config.echoCount || 0 }, (_, i) => ({
+    time: 1.3 - (i + 1) * look.config.echoSpacing,
+    source: drawSignal(
+      createCanvas(1280, 720),
+      1.3 - (i + 1) * look.config.echoSpacing,
+    ),
+  }));
+  new FrameRenderer().render(
+    input,
+    output,
+    look.config,
+    480,
+    288,
+    null,
+    1.3,
+    false,
+    echoes,
+  );
   const thumb = createCanvas(240, 144);
   thumb.getContext("2d").drawImage(output, 0, 0, 240, 144);
   await writeFile(
