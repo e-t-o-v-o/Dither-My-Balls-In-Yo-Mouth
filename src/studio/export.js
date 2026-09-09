@@ -1,5 +1,7 @@
 import { FrameRenderer, drawSignal, SVGContext } from "./renderer";
-import { dimensions } from "./model";
+import { frameDimensions } from "./framing";
+import { EchoSampler } from "./echo-sampler";
+import { RenderService } from "./render-service";
 import { seek, checkAbort, abortError } from "./media";
 export function recordingFormats(
   recorder = typeof MediaRecorder !== "undefined" ? MediaRecorder : null,
@@ -37,12 +39,16 @@ export async function exportStill({
   format,
   time = 0,
   fontFace = "",
+  font,
+  signal,
 }) {
-  if (source.kind === "video") await seek(source.element, time);
+  checkAbort(signal);
+  if (source.kind === "video") await seek(source.element, time, signal);
   const canvas = document.createElement("canvas"),
-    signalCanvas = document.createElement("canvas"),
-    renderer = new FrameRenderer();
-  const { width, height } = dimensions(source.width, source.height, resolution);
+    signalCanvas = document.createElement("canvas");
+  const renderer = new RenderService(),
+    echoes = new EchoSampler(source);
+  const { width, height } = frameDimensions(source, config, resolution);
   if (
     format === "svg" &&
     (Math.ceil(1920 / config.cellSize) ** 2 * Math.min(width, height)) /
@@ -52,38 +58,24 @@ export async function exportStill({
     throw new Error(
       "This SVG would contain too many vector cells. Increase cell size or export a PNG.",
     );
-  const context =
-    format === "svg" ? new SVGContext(width, height, fontFace) : null;
-  renderer.render(
-    sourceFrame(source, time, signalCanvas),
-    canvas,
-    { ...config, smooth: 1 },
-    width,
-    height,
-    context,
-  );
-  if (context)
-    return {
-      blob: new Blob([context.serialize()], { type: "image/svg+xml" }),
-      extension: "svg",
+  try {
+    const echoFrames = await echoes.frames(time, config, signal);
+    const { blob } = await renderer.render(
+      sourceFrame(source, time, signalCanvas),
+      canvas,
+      { ...config, smooth: 1 },
       width,
       height,
-    };
-  const blob = await new Promise((resolve, reject) =>
-    canvas.toBlob(
-      (b) =>
-        b
-          ? resolve(b)
-          : reject(
-              new Error(
-                "The image could not be exported. Try a smaller resolution.",
-              ),
-            ),
-      "image/png",
-    ),
-  );
-  return { blob, extension: "png", width, height };
+      { signal, time, format, fontFace, font, echoFrames },
+    );
+    checkAbort(signal);
+    return { blob, extension: format, width, height };
+  } finally {
+    renderer.dispose();
+    echoes.dispose();
+  }
 }
+
 export async function recordVideo({
   source,
   config,
@@ -95,37 +87,40 @@ export async function recordVideo({
   audioStream,
   signal,
   onProgress,
+  font,
 }) {
   checkAbort(signal);
   const canvas = document.createElement("canvas"),
     signalCanvas = document.createElement("canvas"),
-    renderer = new FrameRenderer();
+    renderer = new RenderService(),
+    echoes = new EchoSampler(source);
   if (!canvas.captureStream)
     throw new Error(
       "Video recording is unavailable in this browser. You can still export PNG, SVG, and GIF.",
     );
-  const { width, height } = dimensions(
-    source.width,
-    source.height,
-    resolution,
-    true,
-  );
+  const { width, height } = frameDimensions(source, config, resolution, true);
   if (source.kind === "video") {
     source.element.pause();
     await seek(source.element, start, signal);
   }
-  const render = (time) =>
-    renderer.render(
+  const render = async (time) => {
+    const echoFrames = await echoes.frames(time, config, signal);
+    return renderer.render(
       sourceFrame(source, time, signalCanvas),
       canvas,
       config,
       width,
       height,
-      null,
-      time,
-      true,
+      { time, flatten: true, signal, font, echoFrames },
     );
-  render(start);
+  };
+  try {
+    await render(start);
+  } catch (error) {
+    renderer.dispose();
+    echoes.dispose();
+    throw error;
+  }
   checkAbort(signal);
   const stream = canvas.captureStream(fps);
   let recorder;
@@ -142,6 +137,8 @@ export async function recordVideo({
     });
   } catch (e) {
     stream.getTracks().forEach((t) => t.stop());
+    renderer.dispose();
+    echoes.dispose();
     throw new Error(
       "This resolution or recording format is not supported. Try 1080p or another format.",
     );
@@ -161,6 +158,8 @@ export async function recordVideo({
     const cleanup = () => {
       clearTimeout(raf);
       clearTimeout(timer);
+      renderer.dispose();
+      echoes.dispose();
       signal?.removeEventListener("abort", abort);
       document.removeEventListener("visibilitychange", visibility);
       if (source.kind === "video") source.element.pause();
@@ -258,7 +257,7 @@ export async function recordVideo({
     };
     signal?.addEventListener("abort", abort, { once: true });
     document.addEventListener("visibilitychange", visibility);
-    const frame = (now) => {
+    const frame = async (now) => {
       if (error || settled) return;
       try {
         const time =
@@ -279,7 +278,8 @@ export async function recordVideo({
           }
         }
         if (now - lastRender >= 1000 / fps - 0.5) {
-          render(Math.min(time, end));
+          await render(Math.min(time, end));
+          if (error || settled) return;
           lastRender = now;
           frames++;
           onProgress?.(Math.min(1, (time - start) / (end - start)));
@@ -336,13 +336,14 @@ export async function exportGIF({
   fps = 12,
   signal,
   onProgress,
+  font,
 }) {
   checkAbort(signal);
   const { default: GIF } = await import("gif.js/dist/gif.js");
   checkAbort(signal);
-  const { width, height } = dimensions(
-    source.width,
-    source.height,
+  const { width, height } = frameDimensions(
+    source,
+    config,
     String(Math.min(720, Number(resolution) || 720)),
   );
   if (!gifBudget(width, height, end - start, fps))
@@ -351,7 +352,8 @@ export async function exportGIF({
     );
   const canvas = document.createElement("canvas"),
     signalCanvas = document.createElement("canvas"),
-    renderer = new FrameRenderer();
+    renderer = new RenderService(),
+    echoes = new EchoSampler(source);
   const gif = new GIF({
     workers: 2,
     quality: 10,
@@ -366,15 +368,14 @@ export async function exportGIF({
       checkAbort(signal);
       const time = start + frame / fps;
       if (source.kind === "video") await seek(source.element, time, signal);
-      renderer.render(
+      const echoFrames = await echoes.frames(time, config, signal);
+      await renderer.render(
         sourceFrame(source, time, signalCanvas),
         canvas,
         config,
         width,
         height,
-        null,
-        time,
-        true,
+        { time, flatten: true, signal, font, echoFrames },
       );
       gif.addFrame(canvas, {
         copy: true,
@@ -410,6 +411,8 @@ export async function exportGIF({
     });
     return { blob, extension: "gif", width, height };
   } finally {
+    renderer.dispose();
+    echoes.dispose();
     gif.abort();
     [...(gif.freeWorkers || []), ...(gif.activeWorkers || [])].forEach((w) =>
       w.terminate(),

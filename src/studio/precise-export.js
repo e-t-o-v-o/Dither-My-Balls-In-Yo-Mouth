@@ -1,19 +1,11 @@
-import { FrameRenderer, drawSignal } from "./renderer";
-import { dimensions } from "./model";
+import { drawSignal } from "./renderer";
+import { RenderService } from "./render-service";
+import { EchoSampler } from "./echo-sampler";
 import { checkAbort, abortError } from "./media";
+import { planVideoExport } from "./export-plan";
+import { createExportTarget } from "./export-storage";
+export { hasPreciseExport, videoBitrate } from "./export-plan";
 
-export const hasPreciseExport = () => typeof VideoEncoder !== "undefined";
-export function videoBitrate(width, height, fps, quality = "high") {
-  return Math.round(
-    Math.min(
-      100_000_000,
-      Math.max(
-        2_000_000,
-        width * height * fps * (quality === "maximum" ? 0.5 : 0.28),
-      ),
-    ),
-  );
-}
 export async function exportPrecise({
   source,
   config,
@@ -26,79 +18,38 @@ export async function exportPrecise({
   quality = "high",
   signal,
   onProgress,
+  font,
 }) {
   checkAbort(signal);
-  if (!hasPreciseExport())
-    throw new Error(
-      "Frame-by-frame video export is unavailable here. Choose Live recording or use a browser with WebCodecs support.",
-    );
-  const m = await import("mediabunny");
-  checkAbort(signal);
-  const { width, height } = dimensions(
-    source.width,
-    source.height,
+  const plan = await planVideoExport({
+    source,
+    config,
     resolution,
-    true,
-  );
-  const bitrate = videoBitrate(width, height, fps, quality);
-  const options = { width, height, quality: new m.Quality({ bitrate }) };
-  let needsAudio = false;
-  if (source.kind === "video" && source.file && includeAudio) {
-    const probe = new m.Input({
-      source: new m.BlobSource(source.file),
-      formats: m.ALL_FORMATS,
-    });
-    try {
-      needsAudio = !!(await probe.getPrimaryAudioTrack());
-    } finally {
-      probe.dispose();
-    }
-    checkAbort(signal);
-  }
-  const aacAvailable = !needsAudio || (await m.canEncodeAudio("aac"));
-  const mp4 =
-    aacAvailable &&
-    format !== "webm" &&
-    (await m.canEncodeVideo("avc", options));
-  let codec = mp4 ? "avc" : null;
-  if (!codec && format !== "mp4") {
-    for (const candidate of quality === "maximum"
-      ? ["vp9", "vp8"]
-      : ["vp8", "vp9"])
-      if (await m.canEncodeVideo(candidate, options)) {
-        codec = candidate;
-        break;
-      }
-  }
-  if (!codec)
-    throw new Error(
-      "This video format cannot encode at the selected size. Try Auto format, a lower resolution, or Live recording.",
-    );
-  const extension = codec === "avc" ? "mp4" : "webm";
-  const duration = end - start;
-  if (
-    !(duration > 0) ||
-    (duration * (bitrate + 256_000)) / 8 > 450 * 1024 * 1024
-  )
-    throw new Error(
-      "This export may exceed the 512 MB memory limit. Shorten the selection or reduce resolution or quality.",
-    );
+    format,
+    fps,
+    start,
+    end,
+    includeAudio,
+    quality,
+    signal,
+  });
+  const m = await import("mediabunny");
+  const { width, height, bitrate, codec, extension, duration } = plan;
+  const options = { quality: new m.Quality({ bitrate }) };
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const renderer = new FrameRenderer();
-  const target = new m.BufferTarget();
-  target.on("write", ({ end: byteEnd }) => {
-    checkAbort(signal);
-    if (byteEnd > 512 * 1024 * 1024)
-      throw new Error(
-        "Export reached the 512 MB memory limit. Use a shorter selection.",
-      );
-  });
+  const renderer = new RenderService(),
+    echoes = new EchoSampler(source);
+  const storage = await createExportTarget(m, plan, signal);
+  const target = storage.target;
+  let completed = false;
   const output = new m.Output({
     format:
       extension === "mp4"
-        ? new m.Mp4OutputFormat({ fastStart: "in-memory" })
+        ? new m.Mp4OutputFormat({
+            fastStart: storage.disk ? false : "in-memory",
+          })
         : new m.WebMOutputFormat(),
     target,
   });
@@ -142,16 +93,18 @@ export async function exportPrecise({
           processedHeight: height,
           process: async (sample) => {
             await yieldUI();
-            renderer.render(
-              sample,
-              canvas,
-              config,
-              width,
-              height,
-              null,
+            const echoFrames = await echoes.frames(
               sample.timestamp,
-              true,
+              config,
+              signal,
             );
+            await renderer.render(sample, canvas, config, width, height, {
+              time: sample.timestamp,
+              flatten: true,
+              signal,
+              font,
+              echoFrames,
+            });
             frames++;
             return canvas;
           },
@@ -187,15 +140,15 @@ export async function exportPrecise({
       const count = Math.ceil(duration * fps);
       for (let frame = 0; frame < count; frame++) {
         await yieldUI();
-        renderer.render(
+        const at = start + frame / fps;
+        const echoFrames = await echoes.frames(at, config, signal);
+        await renderer.render(
           drawSignal(signalCanvas, start + frame / fps),
           canvas,
           config,
           width,
           height,
-          null,
-          start + frame / fps,
-          true,
+          { time: at, flatten: true, signal, font, echoFrames },
         );
         await video.add(frame / fps, Math.min(1 / fps, duration - frame / fps));
         frames++;
@@ -205,11 +158,14 @@ export async function exportPrecise({
       await output.finalize();
     } else throw new Error("Live camera input needs Live recording.");
     checkAbort(signal);
-    if (!target.buffer?.byteLength)
-      throw new Error("The encoder returned an empty file.");
+    const blob = await storage.blob();
+    if (!blob.size) throw new Error("The encoder returned an empty file.");
     onProgress?.(1);
+    completed = true;
     return {
-      blob: new Blob([target.buffer], { type: `video/${extension}` }),
+      blob,
+      cleanup: storage.cleanup,
+      diskBacked: storage.disk,
       extension,
       width,
       height,
@@ -227,5 +183,8 @@ export async function exportPrecise({
     if (output.state !== "finalized" && output.state !== "canceled")
       await output.cancel().catch(() => {});
     input?.dispose();
+    renderer.dispose();
+    echoes.dispose();
+    if (!completed) await storage.cleanup();
   }
 }

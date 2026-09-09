@@ -175,6 +175,7 @@ test("a completed export remains downloadable and is labeled when later settings
 
 test("a selected mask survives trying styles only when Keep mask is enabled", () => {
   render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: /All \d+ styles/ }));
   fireEvent.click(screen.getByRole("button", { name: /Mint cutout/ }));
   fireEvent.click(screen.getByLabelText("Keep mask when changing styles"));
   fireEvent.click(screen.getByRole("button", { name: /Wayfinding/ }));

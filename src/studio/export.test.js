@@ -7,6 +7,8 @@ import {
 import { defaults } from "./model";
 vi.mock("./renderer", () => ({
   FrameRenderer: class {
+    setMatte() {}
+    invalidate() {}
     render() {}
   },
   drawSignal: () => ({}),
@@ -82,7 +84,7 @@ describe("recorder lifecycle", () => {
   });
   test("cancel stops capture tracks and rejects without a partial download", async () => {
     const promise = recordVideo(options());
-    await Promise.resolve();
+    await vi.waitFor(() => expect(recorder?.state).toBe("recording"));
     c.abort();
     await expect(promise).rejects.toHaveProperty("name", "AbortError");
     expect(recorder.state).toBe("inactive");
@@ -111,7 +113,7 @@ describe("recorder lifecycle", () => {
       ...options(),
       source: { kind: "camera", element, width: 320, height: 180 },
     });
-    await Promise.resolve();
+    await vi.waitFor(() => expect(recorder?.state).toBe("recording"));
     c.abort();
     await expect(promise).rejects.toHaveProperty("name", "AbortError");
     expect(element.pause).not.toHaveBeenCalled();
@@ -126,4 +128,19 @@ test("GIF fractional frame periods do not shorten the selection", async () => {
     ).reduce((a, b) => a + b, 0);
     expect(total).toBe(2000);
   }
+});
+
+test("cancelled still exports do no rendering or encoding", async () => {
+  const { exportStill } = await import("./export");
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    exportStill({
+      source: { kind: "demo", width: 320, height: 180 },
+      config: defaults,
+      resolution: "1920",
+      format: "svg",
+      signal: controller.signal,
+    }),
+  ).rejects.toHaveProperty("name", "AbortError");
 });

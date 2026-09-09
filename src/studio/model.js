@@ -20,6 +20,18 @@ export const palettes = {
 };
 export const effects = [
   [
+    "screenprint",
+    "Screenprint",
+    "14",
+    "Rotated ink separations with registration and ink spread.",
+  ],
+  [
+    "contour-type",
+    "Contour type",
+    "15",
+    "Custom lettering follows tonal contours and silhouettes.",
+  ],
+  [
     "beads",
     "Contour beads",
     "11",
@@ -139,8 +151,42 @@ export const defaults = {
   maskInvert: false,
   maskBackdrop: false,
   underlayMode: "source",
+  cropX: 0,
+  cropY: 0,
+  cropWidth: 1,
+  cropHeight: 1,
+  maskStrokes: [],
+  maskImage: "",
+  effectMix: 1,
+  grain: 0,
+  echoCount: 0,
+  echoSpacing: 0.12,
+  echoOpacity: 0.55,
+  echoPalette: "Signal pop",
+  echoThreshold: 120,
+  contourText: "DITHER STUDIO / ",
+  contourLevels: 3,
+  screenAngle: 15,
+  inkSpread: 1,
+  registration: 0,
+  screenMode: "cmyk",
 };
 const numeric = {
+  cropX: [0, 0.95],
+  cropY: [0, 0.95],
+  cropWidth: [0.05, 1],
+  cropHeight: [0.05, 1],
+  effectMix: [0, 1],
+  grain: [0, 0.3],
+  echoCount: [0, 4],
+  echoSpacing: [0.05, 0.5],
+  echoOpacity: [0.1, 1],
+  echoThreshold: [0, 255],
+  contourLevels: [1, 5],
+  screenAngle: [0, 90],
+  inkSpread: [0.5, 1.5],
+  registration: [0, 12],
+
   cellSize: [2, 80],
   threshold: [0, 255],
   brightness: [-100, 100],
@@ -166,7 +212,38 @@ export function sanitizeConfig(input = {}) {
   const c = { ...defaults };
   if (!input || typeof input !== "object" || Array.isArray(input)) return c;
   for (const [k, v] of Object.entries(input)) {
-    if (!(k in c)) continue;
+    if (!Object.hasOwn(c, k)) continue;
+    if (k === "maskStrokes") {
+      if (Array.isArray(v))
+        c.maskStrokes = v
+          .slice(-100)
+          .filter((s) => s && Array.isArray(s.points))
+          .map((s) => ({
+            mode: s.mode === "subtract" ? "subtract" : "add",
+            radius: Math.min(0.25, Math.max(0.002, Number(s.radius) || 0.025)),
+            tool: s.tool === "lasso" ? "lasso" : "brush",
+            points: s.points
+              .slice(0, 2048)
+              .filter(
+                (p) =>
+                  Array.isArray(p) &&
+                  p.length === 2 &&
+                  p.every(Number.isFinite),
+              )
+              .map((p) => p.map((n) => Math.max(0, Math.min(1, n)))),
+          }))
+          .filter((s) => s.points.length);
+      continue;
+    }
+    if (k === "maskImage") {
+      if (
+        typeof v === "string" &&
+        v.length < 4 * 1024 * 1024 &&
+        /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v)
+      )
+        c.maskImage = v;
+      continue;
+    }
     if (numeric[k]) {
       const n = Number(v);
       if (Number.isFinite(n))
@@ -192,7 +269,9 @@ export function sanitizeConfig(input = {}) {
   };
   if (Object.hasOwn(legacy, c.effect)) Object.assign(c, legacy[c.effect]);
   if (!effects.some(([id]) => id === c.effect)) c.effect = defaults.effect;
-  if (c.effect === "beads") c.cellSize = Math.max(6, c.cellSize);
+  if (["beads", "contour-type"].includes(c.effect))
+    c.cellSize = Math.max(6, c.cellSize);
+  if (c.effect === "screenprint") c.cellSize = Math.max(8, c.cellSize);
   if (!methods.some(([id]) => id === c.method)) c.method = defaults.method;
   if (!Object.hasOwn(palettes, c.palette)) c.palette = defaults.palette;
   for (const k of [
@@ -215,11 +294,18 @@ export function sanitizeConfig(input = {}) {
     mosaicLayout: ["staggered", "square"],
     symbolSet: ["mixed", "orbital", "directional"],
     contourSource: ["luminance", "alpha"],
-    maskMode: ["none", "luminance", "color"],
+    maskMode: ["none", "luminance", "color", "manual", "matte"],
+    screenMode: ["cmyk", "duotone"],
     underlayMode: ["source", "palette"],
   }))
     if (!values.includes(c[key])) c[key] = defaults[key];
   if (c.maskLow > c.maskHigh) [c.maskLow, c.maskHigh] = [c.maskHigh, c.maskLow];
+  c.cropWidth = Math.min(c.cropWidth, 1 - c.cropX);
+  c.cropHeight = Math.min(c.cropHeight, 1 - c.cropY);
+  c.echoCount = Math.round(c.echoCount);
+  c.contourLevels = Math.round(c.contourLevels);
+  if (!Object.hasOwn(palettes, c.echoPalette))
+    c.echoPalette = defaults.echoPalette;
   return c;
 }
 export function usesPalette(c) {
@@ -285,6 +371,49 @@ export function parsePresets(value) {
   return result;
 }
 export const looks = [
+  {
+    name: "Overprint",
+    note: "CMYK / offset screens",
+    config: {
+      ...defaults,
+      effect: "screenprint",
+      cellSize: 16,
+      bgColor: "#faf7ed",
+      registration: 2.5,
+      grain: 0.05,
+    },
+  },
+  {
+    name: "Contour poetry",
+    note: "Type / topographic lines",
+    config: {
+      ...defaults,
+      effect: "contour-type",
+      cellSize: 18,
+      fgColor: "#f9ff64",
+      bgColor: "#183142",
+      contourText: "HERE / THERE / EVERYWHERE / ",
+      contourLevels: 3,
+      threshold: 125,
+    },
+  },
+  {
+    name: "Carbon echoes",
+    note: "Silhouettes / delayed color",
+    config: {
+      ...defaults,
+      effect: "pixel",
+      cellSize: 4,
+      echoCount: 3,
+      echoSpacing: 0.15,
+      echoOpacity: 0.8,
+      bgColor: "#f2f0e4",
+      maskMode: "luminance",
+      maskLow: 0,
+      maskHigh: 180,
+      maskSoftness: 0.02,
+    },
+  },
   {
     name: "Cobalt beads",
     note: "Contours / ceramic blue",
@@ -433,7 +562,7 @@ export function dimensions(sw, sh, resolution = "1080", even = false) {
 }
 export function timeLabel(t) {
   if (!Number.isFinite(t)) return "00:00.0";
-  const s = Math.max(0, t);
+  const s = Math.round(Math.max(0, t) * 10) / 10;
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 }
 export function filename(name, ext) {

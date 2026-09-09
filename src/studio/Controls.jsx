@@ -1,4 +1,5 @@
 import React, { useId, useState, useEffect } from "react";
+import { effectFamily } from "./effect-registry";
 import {
   effects,
   methods,
@@ -110,7 +111,9 @@ export function Check({ label, value, onChange, description }) {
     </label>
   );
 }
-function ColorInput({ label, value, onChange }) {
+export function ColorInput({ label, value, onChange }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
   return (
     <label className="control">
       {label}
@@ -121,23 +124,38 @@ function ColorInput({ label, value, onChange }) {
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />
-        <span className="mono">{value.toUpperCase()}</span>
+        <input
+          className="hex-input mono"
+          aria-label={`${label} hex`}
+          value={draft.toUpperCase()}
+          maxLength={7}
+          onChange={(event) => {
+            const v = event.target.value;
+            setDraft(v);
+            if (/^#[a-f0-9]{6}$/i.test(v)) onChange(v);
+          }}
+          onBlur={() => setDraft(value)}
+        />
       </span>
     </label>
   );
 }
-export function MaskControls({ config: c, set }) {
+export function MaskControls({
+  config: c,
+  set,
+  setConfig,
+  showMask,
+  setShowMask,
+  tool,
+  setTool,
+  radius,
+  setRadius,
+  onMatteUpload,
+}) {
   return (
     <>
       <section className="inspector-section">
-        <div className="section-heading">
-          <h2>Selection mask</h2>
-          <span>{c.maskMode === "none" ? "OFF" : "ON"}</span>
-        </div>
-        <p className="hint">
-          Choose the colors or tones that receive the effect. Transparent areas
-          in your source always stay excluded.
-        </p>
+        <h2>Select the subject</h2>
         <Select
           label="Select by"
           value={c.maskMode}
@@ -146,50 +164,121 @@ export function MaskControls({ config: c, set }) {
           <option value="none">Whole image</option>
           <option value="luminance">Brightness range</option>
           <option value="color">Color range</option>
+          <option value="manual">Painted selection</option>
+          <option value="matte">Imported matte</option>
         </Select>
+        {c.maskMode === "luminance" && (
+          <>
+            <Range
+              label="Dark limit"
+              value={c.maskLow}
+              min={0}
+              max={c.maskHigh}
+              onChange={(v) => set("maskLow", v)}
+            />
+            <Range
+              label="Light limit"
+              value={c.maskHigh}
+              min={c.maskLow}
+              max={255}
+              onChange={(v) => set("maskHigh", v)}
+            />
+          </>
+        )}
+        {c.maskMode === "color" && (
+          <>
+            <ColorInput
+              label="Selected color"
+              value={c.maskColor}
+              onChange={(v) => set("maskColor", v)}
+            />
+            <button
+              className={tool === "pick" ? "full selected" : "full"}
+              aria-pressed={tool === "pick"}
+              onClick={() => setTool(tool === "pick" ? "none" : "pick")}
+            >
+              Pick color from preview
+            </button>
+            <Range
+              label="Color range"
+              value={c.maskTolerance * 100}
+              min={1}
+              max={100}
+              unit="%"
+              onChange={(v) => set("maskTolerance", v / 100)}
+            />
+          </>
+        )}
+        {c.maskMode === "matte" && (
+          <>
+            <label className="button full">
+              {c.maskImage ? "Replace matte" : "Import matte"}
+              <input
+                hidden
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={onMatteUpload}
+              />
+            </label>
+            <p className="hint">
+              White selects; black excludes. Use an image with the same framing
+              as your source.
+            </p>
+          </>
+        )}
+        {["color", "luminance"].includes(c.maskMode) && (
+          <Range
+            label="Edge softness"
+            value={c.maskSoftness * 100}
+            min={0}
+            max={30}
+            unit="%"
+            onChange={(v) => set("maskSoftness", v / 100)}
+          />
+        )}
+        <div
+          className="segmented wrap"
+          role="group"
+          aria-label="Selection tools"
+        >
+          {[
+            ["brush", "Brush"],
+            ["erase", "Erase"],
+            ["lasso", "Lasso"],
+          ].map(([id, name]) => (
+            <button
+              key={id}
+              aria-pressed={tool === id}
+              onClick={() => setTool(tool === id ? "none" : id)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        {["brush", "erase"].includes(tool) && (
+          <Range
+            label="Brush size"
+            value={radius * 200}
+            min={1}
+            max={30}
+            unit="%"
+            onChange={(v) => setRadius(v / 200)}
+          />
+        )}
+        {tool !== "none" && (
+          <p className="hint">
+            {tool === "pick"
+              ? "Tap the source color in the preview."
+              : "Draw directly on the preview. Undo restores the previous selection."}
+          </p>
+        )}
         {c.maskMode !== "none" && (
           <>
-            {c.maskMode === "luminance" ? (
-              <>
-                <Range
-                  label="Dark limit"
-                  value={c.maskLow}
-                  min={0}
-                  max={c.maskHigh}
-                  onChange={(v) => set("maskLow", v)}
-                />
-                <Range
-                  label="Light limit"
-                  value={c.maskHigh}
-                  min={c.maskLow}
-                  max={255}
-                  onChange={(v) => set("maskHigh", v)}
-                />
-              </>
-            ) : (
-              <>
-                <ColorInput
-                  label="Selected color"
-                  value={c.maskColor}
-                  onChange={(v) => set("maskColor", v)}
-                />
-                <Range
-                  label="Color range"
-                  value={c.maskTolerance * 100}
-                  min={1}
-                  max={100}
-                  unit="%"
-                  onChange={(v) => set("maskTolerance", v / 100)}
-                />
-              </>
-            )}
-            <Range
-              label="Edge softness"
-              value={c.maskSoftness * 100}
-              min={0}
-              max={30}
-              unit="%"
-              onChange={(v) => set("maskSoftness", v / 100)}
+            <Check
+              label="Show selection overlay"
+              value={showMask}
+              onChange={setShowMask}
+              description="Pink marks excluded areas. The overlay is never exported."
             />
             <Check
               label="Invert selection"
@@ -198,45 +287,54 @@ export function MaskControls({ config: c, set }) {
             />
             <Check
               label="Keep original behind effect"
-              description="Off isolates the selection on your background color or transparency."
               value={c.maskBackdrop}
               onChange={(v) => set("maskBackdrop", v)}
             />
-            <button className="full" onClick={() => set("maskMode", "none")}>
+            <button
+              className="full"
+              onClick={() => {
+                setConfig({
+                  ...c,
+                  maskMode: "none",
+                  maskStrokes: [],
+                  maskImage: "",
+                });
+                setTool("none");
+                setShowMask(false);
+              }}
+            >
               Clear mask
             </button>
           </>
         )}
       </section>
-      <section className="inspector-section">
-        <h2>Working with cutouts</h2>
-        <p className="hint">
-          A transparent PNG gives you an exact silhouette. For video, color and
-          brightness masks follow each frame. These are color selections, not
-          automatic person detection.
-        </p>
-        <p className="hint">
-          Try Dot mosaic or Letterpress with an isolated selection. Contour
-          beads can trace its transparency edge.
-        </p>
-      </section>
+      <details className="inspector-section">
+        <summary>Green screen</summary>
+        <Check
+          label="Remove green"
+          value={c.removeGreen}
+          onChange={(v) => set("removeGreen", v)}
+        />
+        {c.removeGreen && (
+          <Range
+            label="Green separation"
+            value={c.greenTolerance}
+            min={1.05}
+            max={2}
+            step={0.05}
+            onChange={(v) => set("greenTolerance", v)}
+          />
+        )}
+      </details>
     </>
   );
 }
 export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
-  const graphicEffects = [
-    "beads",
-    "mosaic",
-    "symbols",
-    "halftone",
-    "crosshatch",
-    "edge",
-  ];
   const [family, setFamily] = useState(null);
   useEffect(() => setFamily(null), [c.effect]);
-  const activeFamily =
-    family || (graphicEffects.includes(c.effect) ? "Graphic" : "Digital");
+  const activeFamily = family || effectFamily(c.effect);
   const text =
+    c.effect === "contour-type" ||
     ["ascii", "dither-ascii"].includes(c.effect) ||
     (["palette", "two-tone"].includes(c.effect) && c.overlay !== "none");
   return (
@@ -251,14 +349,13 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           role="group"
           aria-label="Effect families"
         >
-          {["Graphic", "Digital"].map((name) => (
+          {["Graphic", "Digital", "Utilities"].map((name) => (
             <button
               key={name}
               aria-pressed={activeFamily === name}
               onClick={() => setFamily(name)}
             >
               {name}
-              <span>{name === "Graphic" ? "06" : "07"}</span>
             </button>
           ))}
         </div>
@@ -266,20 +363,25 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           {effects
             .filter(
               ([id]) =>
-                graphicEffects.includes(id) === (activeFamily === "Graphic"),
+                id !== "dither-ascii" && effectFamily(id) === activeFamily,
             )
             .map(([id, name, n, description]) => (
               <button
                 key={id}
                 aria-label={name}
                 title={description}
-                className={c.effect === id ? "effect selected" : "effect"}
-                aria-pressed={c.effect === id}
+                className={
+                  c.effect === id ||
+                  (id === "ascii" && c.effect === "dither-ascii")
+                    ? "effect selected"
+                    : "effect"
+                }
+                aria-pressed={
+                  c.effect === id ||
+                  (id === "ascii" && c.effect === "dither-ascii")
+                }
                 onClick={() => set("effect", id)}
               >
-                <span className={`effect-art art-${id}`} aria-hidden="true">
-                  {id.includes("ascii") ? "Aa" : id === "channel" ? "RGB" : ""}
-                </span>
                 <span className="effect-name">{name}</span>
               </button>
             ))}
@@ -293,15 +395,14 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           <h2>Texture</h2>
           <span>02</span>
         </div>
-        {usesPalette(c) && (
+        {["ascii", "dither-ascii"].includes(c.effect) && (
           <Select
-            label="Effect palette"
-            value={c.palette}
-            onChange={(v) => set("palette", v)}
+            label="ASCII mode"
+            value={c.effect}
+            onChange={(v) => set("effect", v)}
           >
-            {Object.keys(palettes).map((p) => (
-              <option key={p}>{p}</option>
-            ))}
+            <option value="ascii">Continuous tone</option>
+            <option value="dither-ascii">Dithered tone</option>
           </Select>
         )}
         {c.effect.includes("dither") && (
@@ -330,7 +431,13 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
         <Range
           label="Cell size"
           value={c.cellSize}
-          min={c.effect === "beads" ? 6 : 2}
+          min={
+            c.effect === "screenprint"
+              ? 8
+              : ["beads", "contour-type"].includes(c.effect)
+                ? 6
+                : 2
+          }
           max={80}
           onChange={(v) => set("cellSize", v)}
         />
@@ -500,6 +607,97 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
             )}
           </>
         )}
+        {c.effect === "screenprint" && (
+          <>
+            <Select
+              label="Ink process"
+              value={c.screenMode}
+              onChange={(v) => set("screenMode", v)}
+            >
+              <option value="cmyk">CMYK · four inks</option>
+              <option value="duotone">Duotone · custom inks</option>
+            </Select>
+            <Range
+              label="Screen angle"
+              value={c.screenAngle}
+              min={0}
+              max={90}
+              unit="°"
+              onChange={(v) => set("screenAngle", v)}
+            />
+            <Range
+              label="Registration offset"
+              value={c.registration}
+              min={0}
+              max={12}
+              step={0.25}
+              onChange={(v) => set("registration", v)}
+            />
+            <Range
+              label="Ink spread"
+              value={c.inkSpread}
+              min={0.5}
+              max={1.5}
+              step={0.05}
+              onChange={(v) => set("inkSpread", v)}
+            />
+            {c.screenMode === "duotone" && (
+              <ColorInput
+                label="Second ink"
+                value={c.accentColor}
+                onChange={(v) => set("accentColor", v)}
+              />
+            )}
+            <p className="hint">
+              Ink multiplies over the background. A light paper color gives the
+              clearest separations.
+            </p>
+          </>
+        )}
+        {c.effect === "contour-type" && (
+          <>
+            <label className="control">
+              Contour text
+              <input
+                value={c.contourText}
+                maxLength={128}
+                onChange={(e) => set("contourText", e.target.value)}
+              />
+            </label>
+            <Select
+              label="Trace from"
+              value={c.contourSource}
+              onChange={(v) => set("contourSource", v)}
+            >
+              <option value="luminance">Brightness contours</option>
+              <option value="alpha">Transparency / mask edge</option>
+            </Select>
+            <Range
+              label="Contour level"
+              value={c.threshold}
+              min={1}
+              max={254}
+              onChange={(v) => set("threshold", v)}
+            />
+            {c.contourSource === "luminance" && (
+              <Range
+                label="Contour lines"
+                value={c.contourLevels}
+                min={1}
+                max={5}
+                onChange={(v) => set("contourLevels", v)}
+              />
+            )}
+            <Range
+              label="Letter spacing"
+              value={c.beadSpacing}
+              min={0.65}
+              max={2.5}
+              step={0.05}
+              onChange={(v) => set("beadSpacing", v)}
+            />
+          </>
+        )}
         {c.effect === "crosshatch" && (
           <Range
             label="Stroke weight"
@@ -605,7 +803,12 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
     </>
   );
 }
-export function ColorControls({ config: c, set }) {
+export function ColorControls({
+  config: c,
+  set,
+  motion = false,
+  echoes = false,
+}) {
   return (
     <>
       {usesPalette(c) && (
@@ -694,20 +897,25 @@ export function ColorControls({ config: c, set }) {
           onChange={(v) => set("invert", v)}
         />
         <div className="color-pair">
-          {["fgColor", "bgColor"].map((k, i) => (
-            <label key={k}>
-              <span>{i ? "Background" : "Foreground"}</span>
-              <span className="color-input">
-                <input
-                  aria-label={i ? "Background color" : "Foreground color"}
-                  type="color"
-                  value={c[k]}
-                  onChange={(e) => set(k, e.target.value)}
-                />
-                <span className="mono">{c[k].toUpperCase()}</span>
-              </span>
-            </label>
-          ))}
+          {!usesPalette(c) &&
+            !["pixel", "channel"].includes(c.effect) &&
+            !(c.effect === "screenprint" && c.screenMode === "cmyk") &&
+            !(c.effect === "ascii" && c.textColor !== "foreground") &&
+            !(
+              ["mosaic", "symbols"].includes(c.effect) &&
+              c.shapeColor === "source"
+            ) && (
+              <ColorInput
+                label="Foreground color"
+                value={c.fgColor}
+                onChange={(v) => set("fgColor", v)}
+              />
+            )}
+          <ColorInput
+            label="Background color"
+            value={c.bgColor}
+            onChange={(v) => set("bgColor", v)}
+          />
         </div>
         <Check
           label="Transparent background"
@@ -717,37 +925,93 @@ export function ColorControls({ config: c, set }) {
         />
       </section>
       <section className="inspector-section">
-        <div className="section-heading">
-          <h2>Motion & keying</h2>
-        </div>
+        <h2>Finishing</h2>
         <Range
-          label="Frame response"
-          value={c.smooth * 100}
-          min={5}
+          label="Effect mix"
+          value={c.effectMix * 100}
+          min={0}
           max={100}
-          step={5}
           unit="%"
-          onChange={(v) => set("smooth", v / 100)}
+          onChange={(v) => set("effectMix", v / 100)}
         />
-        <p className="hint">
-          100% follows each frame. Lower values leave a soft motion trail.
-        </p>
-        <Check
-          label="Remove green"
-          value={c.removeGreen}
-          onChange={(v) => set("removeGreen", v)}
+        <Range
+          label="Paper grain"
+          value={c.grain * 100}
+          min={0}
+          max={30}
+          unit="%"
+          onChange={(v) => set("grain", v / 100)}
         />
-        {(c.removeGreen || c.effect === "green-screen") && (
-          <Range
-            label="Green separation"
-            value={c.greenTolerance}
-            min={1.05}
-            max={2}
-            step={0.05}
-            onChange={(v) => set("greenTolerance", v)}
-          />
-        )}
       </section>
+      {motion && (
+        <section className="inspector-section">
+          <h2>Motion</h2>
+          <Range
+            label="Frame response"
+            value={c.smooth * 100}
+            min={5}
+            max={100}
+            step={5}
+            unit="%"
+            onChange={(v) => set("smooth", v / 100)}
+          />
+          <p className="hint">
+            Lower response blends frames into a soft trail.
+          </p>
+          <Range
+            label="Color echoes"
+            value={echoes ? c.echoCount : 0}
+            min={0}
+            max={4}
+            disabled={!echoes}
+            onChange={(v) => set("echoCount", v)}
+          />
+          {!echoes && (
+            <p className="hint">Import a recording to add color echoes.</p>
+          )}
+          {echoes && c.echoCount > 0 && (
+            <>
+              <Range
+                label="Echo spacing"
+                value={c.echoSpacing}
+                min={0.05}
+                max={0.5}
+                step={0.01}
+                unit=" s"
+                onChange={(v) => set("echoSpacing", v)}
+              />
+              <Range
+                label="Echo opacity"
+                value={c.echoOpacity * 100}
+                min={10}
+                max={100}
+                unit="%"
+                onChange={(v) => set("echoOpacity", v / 100)}
+              />
+              <Range
+                label="Echo silhouette threshold"
+                value={c.echoThreshold}
+                min={0}
+                max={255}
+                onChange={(v) => set("echoThreshold", v)}
+              />
+              <Select
+                label="Echo palette"
+                value={c.echoPalette}
+                onChange={(v) => set("echoPalette", v)}
+              >
+                {Object.keys(palettes).map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
+              </Select>
+              <p className="hint">
+                Echoes follow the selection. Without a mask, they follow dark
+                shapes.
+              </p>
+            </>
+          )}
+        </section>
+      )}
     </>
   );
 }

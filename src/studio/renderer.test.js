@@ -239,3 +239,103 @@ test("camera motion trails advance after the first frame", async () => {
   expect(value).toBeGreaterThan(100);
   expect(value).toBeLessThan(155);
 });
+
+test("Channel study keeps all three panels of a transparent source in SVG", async () => {
+  const input = createCanvas(72, 24);
+  const ctx = input.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(24, 0, 24, 24);
+  const c = { ...defaults, effect: "channel", transparent: true, cellSize: 80 };
+  const raster = createCanvas(72, 24),
+    svg = new SVGContext(72, 24);
+  new FrameRenderer().render(input, raster, c, 72, 24);
+  new FrameRenderer().render(input, createCanvas(72, 24), c, 72, 24, svg);
+  const decoded = await loadImage(Buffer.from(svg.serialize()));
+  const vector = createCanvas(72, 24);
+  vector.getContext("2d").drawImage(decoded, 0, 0);
+  const count = (canvas) =>
+    Array.from(canvas.getContext("2d").getImageData(0, 0, 72, 24).data).filter(
+      (v, i) => i % 4 === 3 && v > 128,
+    ).length;
+  expect(count(vector)).toBe(count(raster));
+  expect(count(raster)).toBeGreaterThan(600);
+});
+test("manual corrections preserve source alpha and remain attached when cropped", () => {
+  const input = createCanvas(100, 100),
+    ctx = input.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 100, 100);
+  ctx.clearRect(45, 45, 10, 10);
+  const c = {
+    ...defaults,
+    effect: "pixel",
+    transparent: true,
+    cellSize: 2,
+    cropX: 0.25,
+    cropWidth: 0.5,
+    maskMode: "manual",
+    maskStrokes: [
+      { tool: "brush", mode: "add", radius: 0.1, points: [[0.5, 0.5]] },
+    ],
+  };
+  const out = createCanvas(50, 100);
+  new FrameRenderer().render(input, out, c, 50, 100);
+  const alpha = (x, y) => out.getContext("2d").getImageData(x, y, 1, 1).data[3];
+  expect(alpha(25, 50)).toBe(0);
+  expect(alpha(25, 42)).toBeGreaterThan(200);
+  expect(alpha(5, 50)).toBe(0);
+});
+test("effect mix endpoints and grain preserve transparent composition", () => {
+  const input = createCanvas(40, 40),
+    ctx = input.getContext("2d");
+  ctx.fillStyle = "#2040cc";
+  ctx.fillRect(10, 10, 20, 20);
+  const output = createCanvas(40, 40),
+    renderer = new FrameRenderer();
+  renderer.render(
+    input,
+    output,
+    {
+      ...defaults,
+      effect: "two-tone",
+      effectMix: 0,
+      transparent: true,
+      grain: 0,
+    },
+    40,
+    40,
+  );
+  expect(
+    Array.from(output.getContext("2d").getImageData(20, 20, 1, 1).data),
+  ).toEqual([32, 64, 204, 255]);
+  renderer.render(
+    input,
+    output,
+    { ...defaults, effect: "pixel", transparent: true, grain: 0.2 },
+    40,
+    40,
+  );
+  expect(output.getContext("2d").getImageData(0, 0, 1, 1).data[3]).toBe(0);
+});
+test("screenprint preserves white paper and solid black with zero registration", () => {
+  const input = createCanvas(80, 80),
+    ctx = input.getContext("2d");
+  const output = createCanvas(80, 80);
+  for (const [color, expected] of [
+    ["#ffffff", 255],
+    ["#000000", 0],
+  ]) {
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 80, 80);
+    new FrameRenderer().render(
+      input,
+      output,
+      { ...defaults, effect: "screenprint", bgColor: "#ffffff", cellSize: 40 },
+      80,
+      80,
+    );
+    const pixel = output.getContext("2d").getImageData(40, 40, 1, 1).data;
+    expect(pixel[0]).toBe(expected);
+    expect(pixel[3]).toBe(255);
+  }
+});

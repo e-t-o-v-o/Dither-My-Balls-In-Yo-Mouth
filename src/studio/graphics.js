@@ -1,4 +1,5 @@
 import { rgb, luma, nearest } from "./pixels";
+import { makeCanvas } from "./canvas";
 
 // Marching squares with shared edge vertices. Chains keep bead spacing continuous
 // across cell boundaries instead of restarting dots at every short segment.
@@ -186,7 +187,7 @@ function primitive(ctx, shape, x, y, size) {
 export class GraphicRenderer {
   constructor() {
     this.stamps = new Map();
-    this.layer = document.createElement("canvas");
+    this.layer = makeCanvas();
   }
   begin(ctx, width, height, vector) {
     this.ctx = ctx;
@@ -211,7 +212,7 @@ export class GraphicRenderer {
       key = `${shape}/${diameter}`;
     let stamp = this.stamps.get(key);
     if (!stamp) {
-      const tile = document.createElement("canvas");
+      const tile = makeCanvas();
       tile.width = tile.height = Math.ceil(diameter) + 4;
       const tc = tile.getContext("2d", { willReadFrequently: true });
       tc.fillStyle = "#ffffff";
