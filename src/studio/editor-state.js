@@ -7,6 +7,8 @@ const snapshot = (state) => ({
   effectSettings: state.effectSettings,
 });
 export function historyReducer(state, action) {
+  if (action.type === "begin-adjustment") return { ...state, gesture: true, group: null };
+  if (action.type === "end-adjustment") return { ...state, gesture: false, group: null };
   if (action.type === "undo" || action.type === "redo") {
     const undo = action.type === "undo",
       from = undo ? state.past : state.future;
@@ -15,12 +17,13 @@ export function historyReducer(state, action) {
       ...state,
       ...(undo ? from.at(-1) : from[0]),
       group: null,
+      gesture: false,
       past: undo ? from.slice(0, -1) : [...state.past, snapshot(state)],
       future: undo ? [snapshot(state), ...state.future] : from.slice(1),
     };
   }
   if (action.type === "source")
-    return { ...state, trim: action.trim, past: [], future: [], group: null };
+    return { ...state, trim: action.trim, past: [], future: [], group: null, gesture: false };
   if (action.type === "project")
     return {
       present: sanitizeConfig(action.config),
@@ -34,6 +37,7 @@ export function historyReducer(state, action) {
     trim = state.trim;
   let effectSettings = state.effectSettings || {};
   if (action.type === "trim") trim = action.value;
+  else if (action.type === "effect-reset") present = sanitizeConfig({ ...present, ...action.value });
   else if (action.type === "effect") {
     if (present.effect === action.value) return state;
     effectSettings = {
@@ -55,8 +59,8 @@ export function historyReducer(state, action) {
     JSON.stringify(trim) === JSON.stringify(state.trim)
   )
     return state;
-  const group = action.type === "trim" ? "trim" : action.key;
-  const grouped = group && state.group === group && Date.now() - state.at < 500;
+  const group = state.gesture ? "gesture" : action.type === "trim" ? "trim" : action.key;
+  const grouped = group && state.group === group && (state.gesture || Date.now() - state.at < 500);
   return {
     past: grouped ? state.past : [...state.past, snapshot(state)].slice(-80),
     present,
@@ -64,6 +68,7 @@ export function historyReducer(state, action) {
     effectSettings,
     future: [],
     group,
+    gesture: state.gesture,
     at: Date.now(),
   };
 }

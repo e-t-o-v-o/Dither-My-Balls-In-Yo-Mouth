@@ -1,13 +1,17 @@
-import React, { useId, useState, useEffect } from "react";
-import { effectFamily } from "./effect-registry";
+import React, { createContext, useContext, useId, useRef, useState, useEffect } from "react";
+import { effectFamily, effectDefaults, effectSnapshot } from "./effect-registry";
+import { Dialog } from "./Dialog";
 import {
   effects,
+  defaults,
+  looks,
   methods,
   palettes,
   fonts,
   asciiVariants,
   usesPalette,
 } from "./model";
+export const AdjustmentContext = createContext({ begin() {}, end() {} });
 export function Icon({ name, ...props }) {
   const paths = {
     play: "M8 5l11 7-11 7V5Z",
@@ -24,6 +28,21 @@ export function Icon({ name, ...props }) {
     help: "M9 8a3 3 0 1 1 5 2c-2 1-2 2-2 3m0 3v1M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z",
     back: "M6 5v14M19 5 8 12l11 7V5Z",
     spark: "m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z",
+    chevron: "m8 10 4 4 4-4",
+    expand: "m8 9 4-4 4 4m-8 6 4-4 4 4",
+    collapse: "m8 8 4 4 4-4m-8 7 4 4 4-4",
+    more: "M5 12h.1M12 12h.1M19 12h.1",
+    document: "M6 3h8l4 4v14H6V3Zm8 0v5h4",
+    looks: "M3 4h8v8H3zM15 4h6v5h-6zM3 16h8v5H3zM15 13h6v8h-6z",
+    effect: "M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6",
+    color: "M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4c-1 0-1-2 1-2h3a3 3 0 0 0 3-3 9 9 0 0 0-9-9ZM7 9h.1M11 6h.1M16 8h.1",
+    select: "M8 3H4v5M16 3h4v5M20 16v5h-4M8 21H4v-5M8 12l3 3 5-6",
+    frame: "M6 3v15h15M3 6h15v15",
+    compare: "M12 3v18M9 4H4v16h5M15 4h5v16h-5",
+    loop: "m17 3 4 4-4 4M21 7H7a4 4 0 0 0-4 4m4 10-4-4 4-4m-4 4h14a4 4 0 0 0 4-4",
+    next: "M18 5v14M5 5l11 7-11 7V5Z",
+    panel: "M3 4h18v16H3V4Zm12 0v16",
+    sun: "M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z",
   };
   return (
     <svg
@@ -53,16 +72,41 @@ export function Range({
   disabled = false,
 }) {
   const id = useId();
+  const adjustment = useContext(AdjustmentContext);
+  const formatValue = v => String(Number(Number(v).toFixed(step < 1 ? Math.min(4, Math.ceil(-Math.log10(step)) + 1) : 2)));
+  const dirty = useRef(false);
+  const [draft, setDraft] = useState(formatValue(value));
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!editing) setDraft(formatValue(value));
+  }, [value, editing]);
+  const commit = () => {
+    if (dirty.current && draft.trim() && Number.isFinite(Number(draft))) {
+      const snapped = min + Math.round((Number(draft) - min) / step) * step;
+      adjustment.begin();
+      onChange(Number(Math.max(min, Math.min(max, snapped)).toFixed(6)));
+      adjustment.end();
+    }
+    setEditing(false);
+    setDraft(formatValue(value));
+    dirty.current = false;
+  };
   return (
-    <div className="control">
+    <div className="control range-control">
       <div className="control-label">
         <label htmlFor={id}>{label}</label>
-        <output htmlFor={id}>
-          {Number(value)
-            .toFixed(step < 1 ? 2 : 0)
-            .replace(/\.00$/, "")}
-          {unit}
-        </output>
+        <span className="value-field">
+          <input type="number" aria-label={`${label} exact value`}
+            min={min} max={max} step={step} disabled={disabled}
+            value={draft} inputMode={min < 0 ? "text" : "decimal"}
+            onFocus={(e) => { dirty.current = false; setEditing(true); e.target.select(); }}
+            onChange={(e) => { dirty.current = true; setDraft(e.target.value); }} onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") { dirty.current = false; setDraft(formatValue(value)); setEditing(false); e.stopPropagation(); }
+            }} />
+          {unit && <span>{unit}</span>}
+        </span>
       </div>
       <input
         id={id}
@@ -75,6 +119,15 @@ export function Range({
           "--range-progress": `${((value - min) / (max - min)) * 100}%`,
         }}
         onChange={(e) => onChange(Number(e.target.value))}
+        onPointerDown={(e) => { adjustment.begin(); e.currentTarget.setPointerCapture?.(e.pointerId); }}
+        onPointerUp={() => adjustment.end()}
+        onPointerCancel={() => adjustment.end()}
+        onLostPointerCapture={() => adjustment.end()}
+        onKeyDown={(e) => {
+          if (!e.repeat && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key)) adjustment.begin();
+        }}
+        onKeyUp={() => adjustment.end()}
+        onBlur={() => adjustment.end()}
         disabled={disabled}
       />
     </div>
@@ -331,6 +384,7 @@ export function MaskControls({
 }
 export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
   const [family, setFamily] = useState(null);
+  const [choosing, setChoosing] = useState(false);
   useEffect(() => setFamily(null), [c.effect]);
   const activeFamily = family || effectFamily(c.effect);
   const text =
@@ -339,62 +393,48 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
     (["palette", "two-tone"].includes(c.effect) && c.overlay !== "none");
   return (
     <>
-      <section className="inspector-section">
-        <div className="section-heading">
-          <h2>Effect</h2>
-          <span>01</span>
-        </div>
-        <div
-          className="effect-families"
-          role="group"
-          aria-label="Effect families"
-        >
-          {["Graphic", "Digital", "Utilities"].map((name) => (
-            <button
-              key={name}
-              aria-pressed={activeFamily === name}
-              onClick={() => setFamily(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-        <div className="effect-grid">
-          {effects
-            .filter(
-              ([id]) =>
-                id !== "dither-ascii" && effectFamily(id) === activeFamily,
-            )
-            .map(([id, name, n, description]) => (
-              <button
-                key={id}
-                aria-label={name}
-                title={description}
-                className={
-                  c.effect === id ||
-                  (id === "ascii" && c.effect === "dither-ascii")
-                    ? "effect selected"
-                    : "effect"
-                }
-                aria-pressed={
-                  c.effect === id ||
-                  (id === "ascii" && c.effect === "dither-ascii")
-                }
-                onClick={() => set("effect", id)}
-              >
-                <span className="effect-name">{name}</span>
-              </button>
-            ))}
-        </div>
-        <p className="effect-description">
-          {effects.find(([id]) => id === c.effect)?.[3]}
-        </p>
+      <section className="effect-current">
+        <button className="effect-picker" aria-label="Change effect" onClick={() => setChoosing(true)}>
+          <span><small>{effectFamily(c.effect)}</small><strong>{effects.find(([id]) => id === c.effect)?.[1]}</strong></span><Icon name="chevron" />
+        </button>
+        <p className="effect-description">{effects.find(([id]) => id === c.effect)?.[3]}</p>
       </section>
-      <section className="inspector-section">
-        <div className="section-heading">
-          <h2>Texture</h2>
-          <span>02</span>
+      {choosing && <Dialog title="Choose an effect" onClose={() => setChoosing(false)}>
+        <div className="modal-body effect-library">
+          <div className="segmented effect-families" role="group" aria-label="Effect families">
+            {["Graphic", "Digital", "Utilities"].map(name => <button key={name} aria-pressed={activeFamily === name} onClick={() => setFamily(name)}>{name}</button>)}
+          </div>
+          <div className="effect-grid">
+            {effects.filter(([id]) => id !== "dither-ascii" && effectFamily(id) === activeFamily).map(([id, name, n, description]) => {
+              const look = looks.find(look => look.config.effect === id);
+              const active = c.effect === id || (id === "ascii" && c.effect === "dither-ascii");
+              return <button key={id} aria-label={name} title={description} className="effect" aria-pressed={active} onClick={() => { set("effect", id); setChoosing(false); }}>
+                {look && <img src={`${import.meta.env.BASE_URL}styles/${look.name.toLowerCase().replace(/\s+/g, "-")}.png`} alt="" loading="lazy" width="240" height="144" />}
+                <span className="effect-name">{name}</span><span className="effect-note">{description}</span>
+              </button>;
+            })}
+          </div>
         </div>
+      </Dialog>}
+      <section className="inspector-section effect-adjustments">
+        <Range
+          label="Cell size"
+          value={c.cellSize}
+          min={
+            c.effect === "screenprint"
+              ? 8
+              : ["beads", "contour-type"].includes(c.effect)
+                ? 6
+                : 2
+          }
+          max={80}
+          onChange={(v) => set("cellSize", v)}
+        />
+        <p className="hint">
+          Smaller cells preserve more detail. The pattern scales with your
+          export.
+        </p>
+
         {["ascii", "dither-ascii"].includes(c.effect) && (
           <Select
             label="ASCII mode"
@@ -428,23 +468,6 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
             />
           </>
         )}
-        <Range
-          label="Cell size"
-          value={c.cellSize}
-          min={
-            c.effect === "screenprint"
-              ? 8
-              : ["beads", "contour-type"].includes(c.effect)
-                ? 6
-                : 2
-          }
-          max={80}
-          onChange={(v) => set("cellSize", v)}
-        />
-        <p className="hint">
-          Smaller cells preserve more detail. The pattern scales with your
-          export.
-        </p>
         {["two-tone", "edge"].includes(c.effect) && (
           <Range
             label="Threshold"
@@ -800,6 +823,10 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           )}
         </section>
       )}
+      <button className="quiet full reset-effect" onClick={() => {
+        const reset = { ...effectSnapshot(defaults), ...(effectDefaults[c.effect] || {}) };
+        set("effect-reset", reset);
+      }}><Icon name="undo" />Reset this effect</button>
     </>
   );
 }

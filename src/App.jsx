@@ -23,12 +23,16 @@ import { planVideoExport } from "./studio/export-plan";
 import { exportPrecise, hasPreciseExport } from "./studio/precise-export";
 import { applyStyle, videoPreferences, exportKey } from "./studio/workflow";
 import { usePreview } from "./studio/use-preview";
+import { useAppearance } from "./studio/use-appearance";
+import { useWorkspace } from "./studio/use-workspace";
+import { useCanvasGestures } from "./studio/use-canvas-gestures";
 import { frameDimensions } from "./studio/framing";
 import { SelectionOverlay } from "./studio/SelectionOverlay";
 import { Dialog } from "./studio/Dialog";
 import { StyleBrowser } from "./studio/StyleBrowser";
 import { Timeline } from "./studio/Timeline";
 import { ProjectDownload } from "./studio/ProjectDownload";
+import { CropEditor } from "./studio/CropEditor";
 import { FrameControls } from "./studio/FrameControls";
 import {
   createProject,
@@ -58,6 +62,7 @@ import {
   MaskControls,
   Select,
   Check,
+  AdjustmentContext,
 } from "./studio/Controls";
 import { historyReducer } from "./studio/editor-state";
 function initialHistory() {
@@ -125,6 +130,8 @@ function App() {
     trim = history.trim,
     setTrim = (value) => dispatch({ type: "trim", value }),
     trimRef = useRef(trim);
+  const { tray, setTray, panelWidth, resizePanel, compact } = useWorkspace();
+  const [lookSection, setLookSection] = useState("studio");
   const [tab, setTab] = useState("effects"),
     [keepMask, setKeepMask] = useState(false),
     [compare, setCompare] = useState(false),
@@ -167,13 +174,12 @@ function App() {
     [selectedPreset, setSelectedPreset] = useState(""),
     [customFonts, setCustomFonts] = useState([]),
     fontFaces = useRef({});
-  const [theme, setTheme] = useState(() =>
-      readStorage("dither.theme.v2", "dark"),
-    ),
-    [revision, setRevision] = useState(0),
+  const [theme, setTheme] = useAppearance();
+  const [revision, setRevision] = useState(0),
     [dragging, setDragging] = useState(false);
   const canvasRef = useRef(),
     originalRef = useRef(),
+    exportPreviewRef = useRef(),
     fileInput = useRef(),
     rendererRef = useRef(),
     abortRef = useRef(),
@@ -193,14 +199,11 @@ function App() {
       : liveFormats;
   const set = useCallback((key, value) => {
     if (key === "effect") dispatch({ type: "effect", value });
+    else if (key === "effect-reset") dispatch({ type: "effect-reset", value });
     else dispatch({ key, value });
   }, []);
   sourceRef.current = source;
   trimRef.current = trim;
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    writeStorage("dither.theme.v2", theme);
-  }, [theme]);
   useEffect(() => {
     const persist = () => writeStorage("dither.config.v2", config);
     const timer = setTimeout(persist, 250);
@@ -262,11 +265,13 @@ function App() {
     rendererRef,
     canvasRef,
     originalRef,
+    exportPreviewRef,
     setTime,
     setPlaying,
     alert,
     fontFaces,
   });
+  const canvasNavigation = useCanvasGestures({ zoom, setZoom, previewWidth: source.width * config.cropWidth, selectionTool });
   const projectSnapshot = () =>
     createProject({
       config,
@@ -423,6 +428,7 @@ function App() {
   };
   const adopt = (next) => {
     setPlaying(false);
+    setZoom("fit");
     if (next.kind === "camera") setFps((value) => Math.min(30, value));
     else if (sourceRef.current?.kind === "camera")
       setFps(
@@ -602,6 +608,9 @@ function App() {
   const showExport = () => {
     if (source.kind === "video") source.element.pause();
     setPlaying(false);
+    setShowMask(false);
+    setSelectionTool("none");
+    resetFrame();
     setDialog("export");
     if (
       source.kind === "image" ||
@@ -618,7 +627,7 @@ function App() {
         e.target.closest?.(
           'input,select,textarea,button,dialog,[contenteditable]:not([contenteditable="false"])',
         ) ||
-        dialog ||
+        dialog || document.querySelector("dialog[open]") ||
         busy ||
         loading
       )
@@ -942,7 +951,17 @@ function App() {
         end: trim[1],
         fontFace: fontFaces.current[config.font]?.css || "",
       });
+  const adjustmentHandlers = React.useMemo(() => ({
+    begin: () => dispatch({ type: "begin-adjustment" }),
+    end: () => dispatch({ type: "end-adjustment" }),
+  }), []);
+  const selectTab = (next) => {
+    setTab(next);
+    if (next !== "mask") setSelectionTool("none");
+    if (tray === "canvas") setTray("edit");
+  };
   return (
+    <AdjustmentContext.Provider value={adjustmentHandlers}>
     <div
       className="studio"
       onDragOver={(e) => {
@@ -960,92 +979,29 @@ function App() {
     >
       <header className="topbar">
         <a href="#workspace" className="brand" aria-label="Dither workspace">
-          <span className="brand-mark" aria-hidden="true">
-            ▦
-          </span>
-          <strong>
-            DITHER<span className="brand-dot">.</span>
-          </strong>
-          <span className="byline">by etovo</span>
+          <svg className="brand-mark" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            {[0, 1, 2].flatMap(y => [0, 1, 2].map(x => <circle key={`${x}-${y}`} cx={5 + x * 7} cy={5 + y * 7} r={2.5 - (x + y) * .42} />))}
+          </svg><strong>Dither</strong>
         </a>
+        <button className="document-button" aria-label="Project" title={source.name}
+          disabled={busy || loading} onClick={() => setDialog("project")}>
+          <span className="document-title">{source.name}</span>
+          <span className="document-meta">{source.kind === "demo" ? "Sample" : source.kind === "camera" ? "Live camera" : `${source.width} × ${source.height}`}</span>
+          <Icon name="chevron" />
+        </button>
         <div className="top-actions">
-          <button
-            className="icon-button"
-            title="Undo (⌘/Ctrl Z)"
-            aria-label="Undo"
-            disabled={!history.past.length || busy}
-            onClick={() => dispatch({ type: "undo" })}
-          >
-            <Icon name="undo" />
+          <button className="open-media-button quiet" onClick={() => fileInput.current.click()} disabled={loading || busy} aria-label={loading ? "Opening media" : "Open media"}>
+            <Icon name="upload" /><span>{loading ? "Opening…" : "Open media"}</span>
           </button>
-          <button
-            className="icon-button"
-            title="Redo (⌘/Ctrl Shift Z)"
-            aria-label="Redo"
-            disabled={!history.future.length || busy}
-            onClick={() => dispatch({ type: "redo" })}
-          >
-            <Icon name="redo" />
-          </button>
-          <span className="divider" />
-          <button
-            disabled={busy || loading}
-            onClick={() => setDialog("project")}
-          >
-            Project
-          </button>
-          <button
-            className="icon-button"
-            title="Change appearance"
-            aria-label="Change appearance"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {theme === "dark" ? "☼" : "◐"}
-          </button>
-          <button
-            className="icon-button"
-            aria-label="Help and shortcuts"
-            onClick={() => setDialog("help")}
-            disabled={busy}
-          >
-            <Icon name="help" />
-          </button>
-          <button
-            className="primary"
-            onClick={showExport}
-            disabled={loading || busy}
-          >
-            <Icon name="download" />
-            <span>Export</span>
-          </button>
+          <div className="history-actions">
+            <button className="icon-button" title="Undo (⌘/Ctrl Z)" aria-label="Undo" disabled={!history.past.length || busy} onClick={() => dispatch({ type: "undo" })}><Icon name="undo" /></button>
+            <button className="icon-button" title="Redo (⌘/Ctrl Shift Z)" aria-label="Redo" disabled={!history.future.length || busy} onClick={() => dispatch({ type: "redo" })}><Icon name="redo" /></button>
+          </div>
+          <button className="icon-button panel-toggle" aria-label={tray === "canvas" ? "Show editing controls" : "Focus on canvas"} title={tray === "canvas" ? "Show editing controls" : "Focus on canvas"} onClick={() => setTray(tray === "canvas" ? "edit" : "canvas")}><Icon name="panel" /></button>
+          <button className="primary" onClick={showExport} disabled={loading || busy}><Icon name="download" /><span>Export</span></button>
         </div>
       </header>
-      <div className="sourcebar">
-        <div className="source-actions">
-          <input
-            ref={fileInput}
-            hidden
-            type="file"
-            accept="image/*,video/*"
-            onChange={(e) => openFile(e.target.files[0])}
-          />
-          <button
-            onClick={() => fileInput.current.click()}
-            disabled={loading || busy}
-          >
-            <Icon name="upload" />
-            {loading ? "Opening…" : "Open media"}
-          </button>
-          <button
-            className="quiet"
-            onClick={() => adopt(demo())}
-            disabled={loading || busy}
-          >
-            Test signal
-          </button>
-        </div>
-        <span className="local-label">Files stay on your device</span>
-      </div>
+      <input ref={fileInput} hidden type="file" accept="image/*,video/*" onChange={(e) => openFile(e.target.files[0])} />
       <input
         hidden
         ref={projectInput}
@@ -1080,28 +1036,9 @@ function App() {
           </button>
         </div>
       )}
-      <main id="workspace" className="workspace">
+      <main id="workspace" className="workspace" data-tray={tray} data-layout={compact ? "compact" : "wide"} style={{ "--inspector-width": `${panelWidth}px` }}>
         <section className="editing-area" aria-label="Preview and timeline">
-          <div className="viewer-bar">
-            <div className="file-info">
-              <span className="source-badge">
-                {source.kind === "demo"
-                  ? "DEMO"
-                  : source.kind === "camera"
-                    ? "LIVE"
-                    : source.kind.toUpperCase()}
-              </span>
-              <span title={source.name}>{source.name}</span>
-            </div>
-            <button
-              className={compare ? "small selected" : "small"}
-              aria-pressed={compare}
-              onClick={() => setCompare(!compare)}
-            >
-              Before / after
-            </button>
-          </div>
-          <div className={`viewer ${zoom === "100" ? "zoom-actual" : ""}`}>
+          <div ref={canvasNavigation.viewerRef} {...canvasNavigation.events} className={`viewer ${zoom !== "fit" ? "zoom-actual" : ""}`}>
             {selectionTool !== "none" && (
               <div className="selection-toolbar">
                 <span>
@@ -1124,9 +1061,9 @@ function App() {
                 "--media-aspect":
                   (source.width * config.cropWidth) /
                   (source.height * config.cropHeight),
-                ...(zoom === "100"
+                ...(zoom !== "fit"
                   ? {
-                      width: previewStats.width,
+                      width: source.width * config.cropWidth * Number(zoom) / 100,
                       maxWidth: "none",
                       maxHeight: "none",
                       flexShrink: 0,
@@ -1138,6 +1075,7 @@ function App() {
               {selectionTool !== "none" && (
                 <SelectionOverlay
                   tool={selectionTool}
+                  navigation={canvasNavigation.navigation}
                   config={config}
                   setConfig={(c) => dispatch({ config: c })}
                   radius={brushRadius}
@@ -1170,44 +1108,15 @@ function App() {
                 </>
               )}
             </div>
-            {source.kind === "demo" && (
-              <div className="demo-note">
-                A moving test signal.{" "}
-                <button onClick={() => fileInput.current.click()}>
-                  Open your own video
-                </button>
-              </div>
-            )}
           </div>
           <div className="viewer-footer">
-            <span className="mono">
-              {source.width} × {source.height}
-              <span className="muted"> / SOURCE</span>
-            </span>
-            <div>
-              <select
-                aria-label="Preview zoom"
-                value={zoom}
-                onChange={(event) => setZoom(event.target.value)}
-              >
-                <option value="fit">Fit</option>
-                <option value="100">100%</option>
-              </select>
-              <label htmlFor="preview-quality">Preview</label>
-              <select
-                id="preview-quality"
-                value={previewSize}
-                onChange={(e) => setPreviewSize(e.target.value)}
-              >
-                <option value="auto">Auto · {previewStats.longEdge} px</option>
-                <option value="640">Fast · 640 px</option>
-                <option value="960">Balanced · 960 px</option>
-                <option value="1280">Detailed · 1280 px</option>
-              </select>
-              {playing && (
-                <span className="mono fps">{previewStats.fps} fps</span>
-              )}
+            <div className="view-navigation">
+              <select aria-label="Preview zoom" value={zoom} onChange={e => canvasNavigation.changeZoom(e.target.value)}><option value="fit">Fit</option>{!["fit", "50", "100", "200"].includes(zoom) && <option value={zoom}>{zoom}%</option>}<option value="50">50%</option><option value="100">100%</option><option value="200">200%</option></select>
+              <button className="icon-button mobile-undo" aria-label="Undo adjustment" title="Undo" disabled={!history.past.length || busy} onClick={() => dispatch({ type: "undo" })}><Icon name="undo" /></button>
+              <button className="small preview-settings" onClick={() => setDialog("preview")} title="Preview settings"><span>{previewSize === "auto" ? "Auto preview" : `${previewSize} px preview`}</span><Icon name="chevron" /></button>
+              {playing && <span className="fps">{previewStats.fps} fps</span>}
             </div>
+            <button className={compare ? "small selected" : "small"} aria-pressed={compare} onClick={() => { setSelectionTool("none"); setCompare(!compare); }}><Icon name="compare" /><span>Before / after</span></button>
           </div>
           <Timeline
             source={source}
@@ -1224,85 +1133,30 @@ function App() {
             setLoop={setLoop}
             changeTrim={changeTrim}
             setTrim={setTrim}
-          />
-          <StyleBrowser
-            config={config}
-            source={source}
-            time={timeRef.current}
-            keepMask={keepMask}
-            setKeepMask={setKeepMask}
-            busy={busy}
-            onApply={(look) => {
-              dispatch({
-                config: {
-                  ...applyStyle(look.config, config, keepMask),
-                  cropX: config.cropX,
-                  cropY: config.cropY,
-                  cropWidth: config.cropWidth,
-                  cropHeight: config.cropHeight,
-                },
-              });
-              setSelectedPreset("");
-              setTab("effects");
-            }}
-            onPause={() => {
-              setPlaying(false);
-              source.element?.pause?.();
-            }}
+            frameRate={fps}
           />
         </section>
-        <aside className="inspector" aria-label="Effect inspector">
-          <div
-            className="inspector-tabs"
-            role="tablist"
-            aria-label="Inspector panels"
-          >
-            {[
-              ["effects", "Effects"],
-              ["color", "Finish"],
-              ["frame", "Frame"],
-              ["mask", "Mask"],
-              ["presets", "Presets"],
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                id={`tab-${id}`}
-                role="tab"
-                aria-label={
-                  id === "mask" && config.maskMode !== "none"
-                    ? "Mask, active"
-                    : label
-                }
-                aria-selected={tab === id}
-                aria-controls={`panel-${id}`}
-                tabIndex={tab === id ? 0 : -1}
-                onKeyDown={(e) => {
-                  if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
+        <aside className="inspector" aria-label="Editing controls">
+          <div className="panel-resize" role="separator" aria-label="Inspector width" aria-orientation="vertical" aria-valuemin={300} aria-valuemax={420} aria-valuenow={panelWidth} tabIndex={compact || tray === "canvas" ? -1 : 0} {...resizePanel} />
+          <div className="tray-heading">
+            <span>{tab === "effects" ? "Effect" : tab === "presets" ? "Looks" : tab === "mask" ? "Selection" : tab === "frame" ? "Frame" : "Color & finish"}</span>
+            <div>
+              <button className="small tray-expand" aria-label={tray === "detail" ? "Compact controls" : "Expand controls"} onClick={() => setTray(tray === "detail" ? "edit" : "detail")}><Icon name={tray === "detail" ? "collapse" : "expand"} /><span>{tray === "detail" ? "Less" : "More"}</span></button>
+              <button className="icon-button" aria-label="Show canvas" onClick={() => setTray("canvas")}><Icon name="close" /></button>
+            </div>
+          </div>
+          <div className="inspector-tabs" role="tablist" aria-label="Editing tools">
+            {[["presets", "Looks", "looks"], ["effects", "Effect", "effect"], ["color", "Color", "color"], ["mask", "Select", "select"], ["frame", "Frame", "frame"]].map(([id, label, icon]) => (
+              <button key={id} id={`tab-${id}`} role="tab" aria-label={id === "mask" && config.maskMode !== "none" ? "Select, active" : label}
+                aria-selected={tab === id} aria-controls={`panel-${id}`} tabIndex={tab === id ? 0 : -1}
+                onKeyDown={e => {
+                  const tabs = ["presets", "effects", "color", "mask", "frame"];
+                  if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
                     e.preventDefault();
-                    const tabs = [
-                        "effects",
-                        "color",
-                        "frame",
-                        "mask",
-                        "presets",
-                      ],
-                      next =
-                        tabs[
-                          (tabs.indexOf(tab) +
-                            (e.key === "ArrowRight" ? 1 : 4)) %
-                            5
-                        ];
-                    setTab(next);
-                    document.getElementById(`tab-${next}`).focus();
+                    const next = e.key === "Home" ? tabs[0] : e.key === "End" ? tabs[4] : tabs[(tabs.indexOf(tab) + (e.key === "ArrowRight" ? 1 : 4)) % 5];
+                    selectTab(next); document.getElementById(`tab-${next}`).focus();
                   }
-                }}
-                onClick={() => setTab(id)}
-              >
-                {label}
-                {id === "mask" && config.maskMode !== "none" && (
-                  <span className="mask-indicator" aria-hidden="true" />
-                )}
-              </button>
+                }} onClick={() => selectTab(id)}><Icon name={icon} /><span>{label}</span>{id === "mask" && config.maskMode !== "none" && <span className="mask-indicator" aria-hidden="true" />}</button>
             ))}
           </div>
           <div
@@ -1310,6 +1164,9 @@ function App() {
             id={`panel-${tab}`}
             role="tabpanel"
             aria-labelledby={`tab-${tab}`}
+            tabIndex={0}
+            onFocusCapture={e => { if (compact && e.target.matches("input[type=number], input[type=text], textarea")) setTray("detail"); }}
+            hidden={tray === "canvas"}
           >
             <fieldset className="control-fieldset" disabled={busy || loading}>
               {tab === "effects" && (
@@ -1332,6 +1189,7 @@ function App() {
                 <FrameControls
                   config={config}
                   source={source}
+                  onEditCrop={() => { setPlaying(false); source.element?.pause?.(); setDialog("crop"); }}
                   setConfig={(c) => dispatch({ config: c })}
                   trim={trim}
                   time={time}
@@ -1349,6 +1207,7 @@ function App() {
                   tool={selectionTool}
                   setTool={(tool) => {
                     setSelectionTool(tool);
+                    if (tool !== "none") { setCompare(false); if (compact) setTray("canvas"); }
                     setPlaying(false);
                     source.element?.pause?.();
                   }}
@@ -1359,9 +1218,40 @@ function App() {
               )}
               {tab === "presets" && (
                 <>
+                  <div className="segmented look-sections" role="group" aria-label="Look library">
+                    <button aria-pressed={lookSection === "studio"} onClick={() => setLookSection("studio")}>Studio</button>
+                    <button aria-pressed={lookSection === "saved"} onClick={() => setLookSection("saved")}>Saved <span className="count">{Object.keys(presets).length}</span></button>
+                  </div>
+                  {lookSection === "studio" ? (
+          <StyleBrowser
+            config={config}
+            source={source}
+            time={timeRef.current}
+            keepMask={keepMask}
+            setKeepMask={setKeepMask}
+            busy={busy}
+            onApply={(look) => {
+              dispatch({
+                config: {
+                  ...applyStyle(look.config, config, keepMask),
+                  cropX: config.cropX,
+                  cropY: config.cropY,
+                  cropWidth: config.cropWidth,
+                  cropHeight: config.cropHeight,
+                },
+              });
+              setSelectedPreset("");
+              selectTab("effects");
+            }}
+            onPause={() => {
+              setPlaying(false);
+              source.element?.pause?.();
+            }}
+          />
+                  ) : <>
                   <section className="inspector-section">
                     <div className="section-heading">
-                      <h2>Your presets</h2>
+                      <h2>Saved looks</h2>
                       <span>{Object.keys(presets).length}/50</span>
                     </div>
                     <p className="hint">
@@ -1450,21 +1340,7 @@ function App() {
                       </button>
                     </div>
                   </section>
-                  <section className="inspector-section">
-                    <h2>Workspace</h2>
-                    <Check
-                      label="Light appearance"
-                      value={theme === "light"}
-                      onChange={(v) => setTheme(v ? "light" : "dark")}
-                    />
-                    <button onClick={() => dispatch({ config: defaults })}>
-                      Reset effect settings
-                    </button>
-                    <p className="hint">
-                      You can undo a reset. Your media and presets stay
-                      available.
-                    </p>
-                  </section>
+                  </>}
                 </>
               )}
             </fieldset>
@@ -1477,15 +1353,6 @@ function App() {
           </div>
         </aside>
       </main>
-      <footer className="statusbar">
-        <span>
-          DITHER STUDIO <b>/</b> 03
-        </span>
-        <span>Local processing · No uploads</span>
-        <span className="keyboard-hint">
-          SPACE to play · ⌘ / CTRL Z to undo
-        </span>
-      </footer>
       {dragging && (
         <div className="drop-overlay">
           <Icon name="upload" />
@@ -1513,13 +1380,32 @@ function App() {
           </div>
         </Dialog>
       )}
+      {dialog === "crop" && <CropEditor source={source} config={config} time={time} onClose={() => setDialog(null)} onApply={crop => { dispatch({ config: { ...config, ...crop } }); setZoom("fit"); setDialog(null); }} />}
+      {dialog === "preview" && (
+        <Dialog title="Preview settings" onClose={() => setDialog(null)}>
+          <div className="modal-body">
+            <Select label="Preview quality" value={previewSize} onChange={setPreviewSize}>
+              <option value="auto">Automatic · adapts while editing</option><option value="640">Fast · 640 px</option><option value="960">Balanced · 960 px</option><option value="1280">Detailed · 1280 px</option>
+            </Select>
+            <p className="hint">Preview quality does not limit your export. Automatic mode refines the image when you pause.</p>
+            <div className="export-spec"><span>Source</span><span>{source.width} × {source.height}</span></div>
+          </div>
+        </Dialog>
+      )}
       {dialog === "project" && (
         <Dialog title="Project" onClose={() => setDialog(null)}>
           <div className="modal-body project-dialog">
-            <p>
-              Keep your effect settings, selection, trim, framing, and custom
-              font together. Media stays in its original file.
-            </p>
+            <div className="project-source"><span className="eyebrow">Current source</span><strong>{source.name}</strong><span>{source.width} × {source.height} · {source.kind === "image" ? "Still image" : source.kind === "camera" ? "Live camera" : `${timeLabel(source.duration)} duration`}</span></div>
+            <div className="button-row">
+              <button onClick={() => { setDialog(null); fileInput.current.click(); }}><Icon name="upload" />Replace media</button>
+              <button onClick={() => { adopt(demo()); setDialog(null); }}>Try sample</button>
+            </div>
+            <div className="project-history button-row">
+              <button disabled={!history.past.length} onClick={() => dispatch({ type: "undo" })}><Icon name="undo" />Undo</button>
+              <button disabled={!history.future.length} onClick={() => dispatch({ type: "redo" })}><Icon name="redo" />Redo</button>
+            </div>
+            <h3>Project</h3>
+            <p className="hint">Save your adjustments, selection, framing, and fonts together. Reopen with the original media file.</p>
             <ProjectDownload project={projectSnapshot()} />
             <button
               className="full"
@@ -1538,8 +1424,14 @@ function App() {
               </button>
             )}
             <p className="hint">{autosaveStatus}</p>
+            <h3>Appearance</h3>
+            <div className="segmented" role="group" aria-label="Appearance">
+              {["system", "light", "dark"].map(value => <button key={value} aria-pressed={theme === value} onClick={() => setTheme(value)}>{value[0].toUpperCase() + value.slice(1)}</button>)}
+            </div>
+            <button className="quiet full" onClick={() => setDialog("preview")}>Preview quality & source size</button>
+            <button className="quiet full" onClick={() => setDialog("help")}><Icon name="help" />Help & shortcuts</button>
             <details>
-              <summary>Camera & workspace</summary>
+              <summary>Camera & reset</summary>
               <button
                 onClick={() => {
                   setDialog(null);
@@ -1572,7 +1464,7 @@ function App() {
       )}
       {dialog === "help" && (
         <Dialog
-          title="A little less smooth. A lot more character."
+          title="Help & shortcuts"
           onClose={() => setDialog(null)}
         >
           <div className="modal-body help-body">
@@ -1625,11 +1517,12 @@ function App() {
       )}
       {dialog === "export" && (
         <Dialog
-          title="Export your work"
+          title="Export"
           onClose={() => setDialog(null)}
           busy={busy}
         >
           <div className="modal-body">
+            <canvas ref={exportPreviewRef} className="export-preview" aria-label="Export composition preview" />
             <div className="export-source">
               <span className="eyebrow">
                 {source.kind === "image"
@@ -1704,62 +1597,20 @@ function App() {
                   )}
                 </Select>
               </div>
-              {!["png", "svg"].includes(format) && (
-                <>
-                  <Select
-                    label="Frame rate"
-                    value={fps}
-                    onChange={(v) => setFps(Number(v))}
-                  >
-                    {(format === "gif"
-                      ? [10, 12, 15]
-                      : usePrecise
-                        ? [24, 30, 60]
-                        : [24, 30]
-                    ).map((n) => (
-                      <option key={n} value={n}>
-                        {n} fps
-                      </option>
-                    ))}
-                  </Select>
-                  {format !== "gif" && source.kind !== "camera" && (
-                    <Select
-                      label="Export mode"
-                      value={engine}
-                      onChange={(v) => {
-                        setEngine(v);
-                        if (v === "live" && fps > 30) setFps(30);
-                      }}
-                    >
-                      {hasPreciseExport() && (
-                        <option value="precise">
-                          Frame by frame · best quality
-                        </option>
-                      )}
-                      <option value="live">
-                        Live recording · compatibility
-                      </option>
-                    </Select>
-                  )}
-                  {format !== "gif" && usePrecise && (
-                    <Select
-                      label="Encoding quality"
-                      value={quality}
-                      onChange={setQuality}
-                    >
-                      <option value="high">High · balanced file size</option>
-                      <option value="maximum">Maximum · crisp texture</option>
-                    </Select>
-                  )}
-                  {format !== "gif" && source.kind === "video" && (
-                    <Check
-                      label="Include source audio"
-                      value={includeAudio}
-                      onChange={setIncludeAudio}
-                    />
-                  )}
-                </>
-              )}
+              {!["png", "svg", "gif"].includes(format) && usePrecise && <Select label="Encoding quality" value={quality} onChange={setQuality}><option value="high">High · balanced file size</option><option value="maximum">Maximum · crisp texture</option></Select>}
+              {!["png", "svg", "gif"].includes(format) && source.kind === "video" && <Check label="Include source audio" value={includeAudio} onChange={setIncludeAudio} />}
+              <details className="export-advanced">
+                <summary>Advanced settings</summary>
+                {!["png", "svg"].includes(format) && <Select label="Frame rate" value={fps} onChange={v => setFps(Number(v))}>
+                  {(format === "gif" ? [10, 12, 15] : usePrecise ? [24, 30, 60] : [24, 30]).map(n => <option key={n} value={n}>{n} fps</option>)}
+                </Select>}
+                {!["png", "svg", "gif"].includes(format) && source.kind !== "camera" && <Select label="Export mode" value={engine} onChange={v => { setEngine(v); if (v === "live" && fps > 30) setFps(30); }}>
+                  {hasPreciseExport() && <option value="precise">Frame by frame · best quality</option>}<option value="live">Live recording · compatibility</option>
+                </Select>}
+                <p className="hint">Source: {source.width} × {source.height}. Preview quality does not limit export resolution.</p>
+                {exportPlan?.codec && <p className="hint">{exportPlan.codec.toUpperCase()} · {exportPlan.disk ? "Uses temporary device storage to limit memory use." : "Available memory checked."}</p>}
+                {["png", "svg"].includes(format) && <p className="hint">Transparent backgrounds are preserved. SVG embeds raster content when a source underlay is enabled.</p>}
+              </details>
               <div className="export-spec">
                 <span className="mono">
                   {exportDimensions.width} × {exportDimensions.height}
@@ -1783,9 +1634,9 @@ function App() {
                         ? "Records in real time. Keep this tab visible. Slow rendering can drop frames; choose Frame by frame for reliable motion."
                         : "This browser supports live recording only. Keep this tab visible. Frame rate depends on playback and device speed."}
               </p>
-              {exportDimensions.width > source.width && (
+              {(exportDimensions.width > Math.ceil(source.width * config.cropWidth) + 1 || exportDimensions.height > Math.ceil(source.height * config.cropHeight) + 1) && (
                 <p className="hint">
-                  Source detail: {source.width} × {source.height}. Larger
+                  Cropped source detail: {Math.round(source.width * config.cropWidth)} × {Math.round(source.height * config.cropHeight)}. Larger
                   exports redraw the effect geometry at the selected size.
                 </p>
               )}
@@ -1799,7 +1650,7 @@ function App() {
                   {exportPlan.checking
                     ? "Checking video, audio, and available space…"
                     : exportPlan.error ||
-                      `${exportPlan.extension.toUpperCase()} · ${exportPlan.codec.toUpperCase()} · approximately ${(exportPlan.estimatedBytes / 1024 / 1024).toFixed(1)} MB · ${exportPlan.disk ? "disk-backed export" : "memory checked"}`}
+                      `${exportPlan.extension.toUpperCase()} · approximately ${(exportPlan.estimatedBytes / 1024 / 1024).toFixed(1)} MB · Ready to export`}
                 </p>
               )}
               <button
@@ -1911,6 +1762,7 @@ function App() {
         </Dialog>
       )}
     </div>
+    </AdjustmentContext.Provider>
   );
 }
 export default App;

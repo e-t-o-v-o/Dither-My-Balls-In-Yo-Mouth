@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Dialog } from "./Dialog";
 import { looks } from "./model";
 import { drawSignal } from "./renderer";
 import { RenderService } from "./render-service";
@@ -18,17 +17,21 @@ export function StyleBrowser({
   onApply,
   onPause,
 }) {
-  const [open, setOpen] = useState(false),
-    [previews, setPreviews] = useState({}),
+  const [previews, setPreviews] = useState({}),
     [rendering, setRendering] = useState(false),
     [error, setError] = useState("");
   const controller = useRef();
   useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => {
+    controller.current?.abort();
+    setPreviews({});
+    setRendering(false);
+  }, [config, source, keepMask]);
   const close = () => {
     controller.current?.abort();
-    setOpen(false);
   };
   const preview = async () => {
+    onPause();
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
@@ -106,55 +109,15 @@ export function StyleBrowser({
     </button>
   );
   return (
-    <>
-      <section className="looks-section">
-        <div className="section-heading">
-          <h2>Style starters</h2>
-          <button
-            className="text-button"
-            onClick={() => {
-              onPause();
-              setOpen(true);
-              setPreviews({});
-            }}
-            disabled={busy}
-          >
-            All {looks.length} styles
-          </button>
-        </div>
-        {config.maskMode !== "none" && (
-          <label className="style-options">
-            <input
-              type="checkbox"
-              checked={keepMask}
-              onChange={(e) => setKeepMask(e.target.checked)}
-              disabled={busy}
-            />
-            Keep mask when changing styles
-          </label>
-        )}
-        <div className="looks">
-          {looks.slice(0, 6).map((look) => card(look))}
-        </div>
-      </section>
-      {open && (
-        <Dialog title="Style library" onClose={close}>
-          <div className="modal-body style-library">
-            <div className="style-preview-actions">
-              <p className="hint">Apply a complete look, then make it yours.</p>
-              <button onClick={preview} disabled={rendering}>
-                {rendering
-                  ? `Rendering ${Object.keys(previews).length} / ${looks.length}…`
-                  : "Preview this frame"}
-              </button>
-            </div>
-            {error && <p className="inline-error">{error}</p>}
-            <div className="style-library-grid">
-              {looks.map((look) => card(look, true))}
-            </div>
-          </div>
-        </Dialog>
-      )}
-    </>
+    <section className="looks-section">
+      <div className="section-heading"><h2>Studio looks</h2><span>{looks.length} styles</span></div>
+      <p className="hint">A starting point for your next piece.</p>
+      {config.maskMode !== "none" && <label className="check style-options"><input type="checkbox" checked={keepMask} onChange={e => setKeepMask(e.target.checked)} disabled={busy} /><span>Keep selection when changing looks</span></label>}
+      <button className="full style-preview-button" onClick={preview} disabled={rendering || busy}>
+        {rendering ? `Previewing ${Object.keys(previews).length} / ${looks.length}…` : "Preview looks on this frame"}
+      </button>
+      {error && <p className="inline-error">{error}</p>}
+      <div className="style-library-grid">{looks.map(look => card(look, true))}</div>
+    </section>
   );
 }

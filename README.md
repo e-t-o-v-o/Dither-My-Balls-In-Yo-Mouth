@@ -1,12 +1,12 @@
 # Dither Studio — by etovo
 
-A local video, image, and webcam effects studio. Version 3 puts video, precise exports, and reusable projects at the center of a desktop and tablet workspace.
+A local video, image, and webcam effects studio. A canvas-centered workspace adapts to desktop, tablet, and phone, with matching light and dark appearances.
 
 ## Use the studio
 
 1. Open a video or image, enable the camera, or experiment with the built-in moving test signal.
-2. Pick a starting look. Adjust **Effects**, **Finish**, **Frame**, and **Mask**, then use **Before / after** to compare.
-3. Scrub the timeline. Set **In** and **Out** in seconds, or use **Set here** at the playhead. The highlighted range shows the export selection; **Full clip** resets it. Arrow keys seek 0.1 seconds (Shift: 1 second), and **I / O** set the trim.
+2. Choose a starter in **Looks**. Tune **Effect**, **Color**, **Select**, and **Frame**, then use **Before / after** to compare. On a phone, expand the controls for detailed editing or hide them to work directly on the canvas.
+3. Scrub the timeline. Open **Trim** to drag the range handles, enter **In** and **Out** in seconds, or set either boundary at the playhead. Choose a frame-step rate for fine seeking. The highlighted range shows the export selection; **Full clip** resets it. Arrow keys seek 0.1 seconds (Shift: 1 second), and **I / O** set the trim.
 4. Choose **Export**, select the format and resolution, and create the file. A completed export stays available behind a Download button, including on iPad. It is labeled as a previous export when relevant edits change. Video export preferences are remembered.
 
 The app never uploads your media. Settings and named presets are stored locally, with validated JSON import/export for backups. Original media is unchanged. Project files and local autosaves also preserve framing, trim, selections, per-effect settings, and the active custom font. Relink the original media when reopening a project on another device. Fonts are embedded in SVG exports.
@@ -18,14 +18,16 @@ The app never uploads your media. Settings and named presets are stored locally,
 - Fifteen style starters, including CMYK Overprint, Contour poetry, and Carbon echoes. Preview the current source frame across the entire style library on demand.
 - Brightness/color selection, original-source eyedropper, paint/erase/lasso corrections, imported mattes, selection overlay, and optional original backdrop. Selection is manual or tonal; there is no automatic subject detection.
 - CMYK/duotone screens, contour lettering, fixed-time color echoes, effect/source mixing, and normalized paper grain.
-- Original palette and character-set collections. **Keep mask when changing styles** lets you try looks without losing a tuned selection.
+- Original palette and character-set collections. **Keep selection when changing looks** lets you try looks without losing a tuned selection.
 - Brightness, contrast, saturation, inversion, transparency, chroma keying, and temporal smoothing.
 - Video playback, scrubbing, looping, trim controls, audio monitoring, and undo/redo of effect settings and trim, with separate remembered settings for each effect.
 - Worker rendering with a compatibility fallback. Adaptive preview resolution reduces work during playback and refines paused frames. Export resolution stays independent.
 - Source-attached selections and shared Original/16:9/9:16/Square/4:5 framing across preview and export; filmstrip trim handles and precise numeric controls.
 - Frame-by-frame MP4/WebM at 24, 30, or 60 fps where WebCodecs is available; live recording for compatibility and cameras; looping GIF; PNG and SVG frames.
 - Export progress, cancellation, encoding/decode errors, source cleanup, and explicit download/share actions.
-- Keyboard navigation, native modal focus management, dark/light appearance, and responsive inspector layouts.
+- System/light/dark appearance, a resizable desktop inspector, expandable phone and tablet controls, keyboard navigation, and native modal focus management.
+- Direct crop editing with staged Apply/Cancel, exact numeric adjustments, one undo step per slider gesture, and canvas zoom/pan independent of rendering.
+- Project controls in the document bar, integrated style browsing, and a composition preview in Export; advanced encoding choices expand on demand.
 
 ## Run and verify
 
@@ -77,6 +79,8 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 - `src/studio/use-preview.js`, `render-service.js`, `render-worker.js`: adaptive preview, worker backpressure, and cancellable rendering.
 - `src/studio/selection.js`, `framing.js`: source-attached selections and shared framing.
 - `src/studio/print-effects.js`, `finishing.js`, `echo-sampler.js`: print/type treatments, compositing, and fixed media-time echo samples.
+- `src/studio/use-appearance.js`, `use-workspace.js`, `use-canvas-gestures.js`: appearance, adaptive layout, and view-only navigation.
+- `src/studio/CropEditor.jsx`, `crop-geometry.js`, `TimeField.jsx`: staged source framing and precise committed values.
 - `src/studio/Timeline.jsx`, `Filmstrip.jsx`, `StyleBrowser.jsx`: compact video controls and on-demand style previews.
 - `src/studio/export-plan.js`, `export-storage.js`: export preflight and temporary disk-backed output.
 - `src/studio/Controls.jsx`: accessible inspector controls and icons.
@@ -99,3 +103,5 @@ See [Graphic styles review](docs/GRAPHIC-STYLES.md) for the v2.2 reference-inspi
 See [Workflow review](docs/WORKFLOW-REVIEW.md) for v2.3 editing refinements and compositing fixes.
 
 See [Workspace v3](docs/WORKSPACE-V3.md) for the implementation, validation, and remaining platform limits.
+
+See [Design workspace](docs/DESIGN-WORKSPACE.md) for the responsive redesign, interaction decisions, and verification limits.
