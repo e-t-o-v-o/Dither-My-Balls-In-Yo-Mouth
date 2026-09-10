@@ -94,3 +94,19 @@ test("clock labels round across minute boundaries", () => {
   expect(timeLabel(59.96)).toBe("01:00.0");
   expect(timeLabel(119.96)).toBe("02:00.0");
 });
+
+test("a long adjustment is one undo step and the next gesture is independent", () => {
+  let s = historyReducer(initial(), { type: "begin-adjustment" });
+  s = historyReducer(s, { key: "cellSize", value: 12 });
+  s = { ...s, at: Date.now() - 3000 };
+  s = historyReducer(s, { key: "cellSize", value: 25 });
+  s = historyReducer(s, { type: "end-adjustment" });
+  expect(s.past).toHaveLength(1);
+  s = historyReducer(s, { type: "begin-adjustment" });
+  s = historyReducer(s, { key: "cellSize", value: 30 });
+  s = historyReducer(s, { type: "end-adjustment" });
+  s = historyReducer(s, { type: "undo" });
+  expect(s.present.cellSize).toBe(25);
+  s = historyReducer(s, { type: "undo" });
+  expect(s.present.cellSize).toBe(8);
+});

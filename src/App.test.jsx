@@ -34,17 +34,18 @@ test("opens directly into a usable studio with no camera permission request", ()
 });
 test("effect changes can be undone and redone", () => {
   render(<App />);
-  const ascii = screen.getByRole("button", { name: "ASCII" });
-  fireEvent.click(ascii);
-  expect(ascii).toHaveAttribute("aria-pressed", "true");
-  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-  expect(ascii).toHaveAttribute("aria-pressed", "false");
-  fireEvent.click(screen.getByRole("button", { name: "Redo" }));
-  expect(ascii).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Change effect" }));
+  fireEvent.click(screen.getByRole("button", { name: "ASCII", exact: true }));
+  expect(screen.getByRole("button", { name: "Change effect" })).toHaveTextContent("ASCII");
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(screen.getByRole("button", { name: "Change effect" })).toHaveTextContent("Dither");
+  fireEvent.click(screen.getByRole("button", { name: "Redo", exact: true }));
+  expect(screen.getByRole("button", { name: "Change effect" })).toHaveTextContent("ASCII");
 });
 test("preset save and restore work without blocking prompts", () => {
   render(<App />);
-  fireEvent.click(screen.getByRole("tab", { name: "Presets" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Looks" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Saved/ }));
   fireEvent.change(screen.getByLabelText("Preset name"), {
     target: { value: "My look" },
   });
@@ -70,9 +71,11 @@ test("export offers current-frame formats and explicit dimensions", () => {
 });
 test("trim controls clamp an invalid range", () => {
   render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Trim", exact: true }));
   fireEvent.change(screen.getByLabelText("Trim start in seconds"), {
     target: { value: "999" },
   });
+  fireEvent.blur(screen.getByLabelText("Trim start in seconds"));
   expect(
     Number(screen.getByLabelText("Trim start in seconds").value),
   ).toBeLessThan(Number(screen.getByLabelText("Trim end in seconds").value));
@@ -98,9 +101,12 @@ test("keyboard seeking and trim shortcuts select a clip and Full clip restores i
   fireEvent.keyDown(window, { key: "ArrowRight", shiftKey: true });
   expect(Number(screen.getByLabelText("Video playhead").value)).toBe(1);
   fireEvent.keyDown(window, { key: "i" });
+  fireEvent.click(screen.getByRole("button", { name: "Trim", exact: true }));
   expect(screen.getByLabelText("Trim start in seconds")).toHaveValue(1);
+  fireEvent.click(screen.getByRole("button", { name: "Done", exact: true }));
   fireEvent.keyDown(window, { key: "ArrowRight", shiftKey: true });
   fireEvent.keyDown(window, { key: "o" });
+  fireEvent.click(screen.getByRole("button", { name: "Trim", exact: true }));
   expect(screen.getByLabelText("Trim end in seconds")).toHaveValue(2);
   fireEvent.keyDown(screen.getByLabelText("Trim end in seconds"), {
     key: "ArrowRight",
@@ -137,6 +143,7 @@ test("video resolution survives a GIF detour and a new session", () => {
 
 test("latest effect settings are saved when leaving before the debounce fires", () => {
   render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Change effect" }));
   fireEvent.click(screen.getByRole("button", { name: "ASCII", exact: true }));
   fireEvent(window, new Event("pagehide"));
   expect(JSON.parse(localStorage.getItem("dither.config.v2")).effect).toBe(
@@ -175,14 +182,67 @@ test("a completed export remains downloadable and is labeled when later settings
 
 test("a selected mask survives trying styles only when Keep mask is enabled", () => {
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: /All \d+ styles/ }));
+  fireEvent.click(screen.getByRole("tab", { name: "Looks" }));
   fireEvent.click(screen.getByRole("button", { name: /Mint cutout/ }));
-  fireEvent.click(screen.getByLabelText("Keep mask when changing styles"));
+  fireEvent.click(screen.getByRole("tab", { name: "Looks" }));
+  fireEvent.click(screen.getByLabelText("Keep selection when changing looks"));
   fireEvent.click(screen.getByRole("button", { name: /Wayfinding/ }));
-  fireEvent.click(screen.getByRole("tab", { name: /^Mask/ }));
+  fireEvent.click(screen.getByRole("tab", { name: /^Select/ }));
   expect(screen.getByLabelText("Select by")).toHaveValue("luminance");
-  fireEvent.click(screen.getByLabelText("Keep mask when changing styles"));
+  fireEvent.click(screen.getByRole("tab", { name: "Looks" }));
+  fireEvent.click(screen.getByLabelText("Keep selection when changing looks"));
   fireEvent.click(screen.getByRole("button", { name: /Wayfinding/ }));
-  fireEvent.click(screen.getByRole("tab", { name: /^Mask/ }));
+  fireEvent.click(screen.getByRole("tab", { name: /^Select/ }));
   expect(screen.getByLabelText("Select by")).toHaveValue("none");
+});
+
+
+test("exact adjustments commit on blur, reject empty input, and remain undoable", () => {
+  render(<App />);
+  const value = screen.getByLabelText("Cell size exact value");
+  fireEvent.focus(value);
+  fireEvent.change(value, { target: { value: "23" } });
+  expect(screen.getByRole("slider", { name: "Cell size", exact: true })).toHaveValue("8");
+  fireEvent.blur(value);
+  expect(screen.getByRole("slider", { name: "Cell size", exact: true })).toHaveValue("23");
+  fireEvent.focus(value);
+  fireEvent.change(value, { target: { value: "" } });
+  fireEvent.blur(value);
+  expect(value).toHaveValue(23);
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(value).toHaveValue(8);
+});
+
+test("appearance follows System by default and saves an explicit override without changing effects", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Project", exact: true }));
+  expect(screen.getByRole("button", { name: "System", exact: true })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Dark", exact: true }));
+  expect(document.documentElement.dataset.theme).toBe("dark");
+  expect(JSON.parse(localStorage.getItem("dither.theme.v2"))).toBe("dark");
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  expect(screen.getByRole("slider", { name: "Cell size", exact: true })).toHaveValue("8");
+});
+
+test("canvas focus retains the current effect and the dock restores editing", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Focus on canvas" }));
+  expect(screen.queryByRole("slider", { name: "Cell size", exact: true })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Show editing controls" }));
+  expect(screen.getByRole("slider", { name: "Cell size", exact: true })).toHaveValue("8");
+});
+
+test("crop edits are staged until Apply and one undo restores the original frame", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Frame", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Edit crop on image", exact: true }));
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "1:1", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel", exact: true }));
+  expect(screen.getByLabelText("Horizontal position exact value")).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Edit crop on image", exact: true }));
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "1:1", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Apply crop", exact: true }));
+  expect(screen.getByLabelText("Horizontal position exact value")).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(screen.getByLabelText("Horizontal position exact value")).toBeDisabled();
 });

@@ -7,7 +7,18 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#101113" />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      // Apply saved appearance before the first paint, including browser chrome.
+      (() => {
+        let preference = "system";
+        try { preference = JSON.parse(localStorage.getItem("dither.theme.v2")) || "system"; } catch {}
+        const dark = preference === "dark" ||
+          (preference !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        document.querySelector('meta[name="theme-color"]').content = dark ? "#1d2026" : "#ffffff";
+      })();
+    </script>
     <meta
       name="description"
       content="Dither Studio by etovo. Craft video and image treatments with screenprint, contour type, color echoes, dithers, and precise local exports."

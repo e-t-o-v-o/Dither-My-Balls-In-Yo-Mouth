@@ -1,9 +1,20 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
+import { AdjustmentContext } from "./Controls";
 import { createVideoElement, waitForMedia, seek, releaseSource } from "./media";
 import { drawSignal } from "./renderer";
-export function Filmstrip({ source, trim, changeTrim, disabled }) {
+export function Filmstrip({ source, trim, changeTrim, disabled, interactive = true }) {
+  const adjustment = useContext(AdjustmentContext);
+  const [activeHandle, setActiveHandle] = useState(0);
+  const [width, setWidth] = useState(0);
   const [images, setImages] = useState([]),
     track = useRef();
+  useEffect(() => {
+    if (!interactive || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(track.current);
+    return () => observer.disconnect();
+  }, [interactive]);
+  const overlap = interactive && width > 0 && width * (trim[1] - trim[0]) / source.duration < 44;
   useEffect(() => {
     const controller = new AbortController();
     let video;
@@ -57,7 +68,8 @@ export function Filmstrip({ source, trim, changeTrim, disabled }) {
     );
   };
   return (
-    <div className="filmstrip" ref={track}>
+    <>
+    <div className={`filmstrip ${interactive ? "interactive" : ""}`} ref={track}>
       <div className="filmstrip-images" aria-hidden="true">
         {images.map((src, i) => (
           <img key={i} src={src} alt="" />
@@ -70,7 +82,7 @@ export function Filmstrip({ source, trim, changeTrim, disabled }) {
           right: `${(1 - trim[1] / source.duration) * 100}%`,
         }}
       />
-      {[0, 1].map((index) => (
+      {(interactive ? overlap ? [activeHandle] : [0, 1] : []).map((index) => (
         <button
           key={index}
           className={`trim-handle ${index ? "out" : "in"}`}
@@ -83,9 +95,13 @@ export function Filmstrip({ source, trim, changeTrim, disabled }) {
           disabled={disabled}
           style={{ left: `${(trim[index] / source.duration) * 100}%` }}
           onPointerDown={(event) => {
+            adjustment.begin();
             event.currentTarget.setPointerCapture(event.pointerId);
             drag(event, index);
           }}
+          onPointerUp={() => adjustment.end()}
+          onPointerCancel={() => adjustment.end()}
+          onLostPointerCapture={() => adjustment.end()}
           onPointerMove={(event) => {
             if (event.currentTarget.hasPointerCapture(event.pointerId))
               drag(event, index);
@@ -95,6 +111,7 @@ export function Filmstrip({ source, trim, changeTrim, disabled }) {
               ["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
             ) {
               event.preventDefault();
+              if (!event.repeat) adjustment.begin();
               changeTrim(
                 index,
                 event.key === "Home"
@@ -107,10 +124,14 @@ export function Filmstrip({ source, trim, changeTrim, disabled }) {
               );
             }
           }}
+          onKeyUp={() => adjustment.end()}
+          onBlur={() => adjustment.end()}
         >
           <span />
         </button>
       ))}
     </div>
+    {overlap && <div className="handle-choice"><span>Adjust short selection</span><div className="segmented" role="group" aria-label="Trim handle">{[0, 1].map(index => <button key={index} aria-pressed={activeHandle === index} onClick={() => setActiveHandle(index)}>{index ? "Out" : "In"}</button>)}</div></div>}
+    </>
   );
 }

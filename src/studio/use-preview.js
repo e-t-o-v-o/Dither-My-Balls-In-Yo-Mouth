@@ -163,6 +163,13 @@ export function usePreview(options) {
           canvas.width = size.width;
           canvas.height = size.height;
           canvas.getContext("2d").drawImage(stage, 0, 0);
+          const exportPreview = latest.current.exportPreviewRef?.current;
+          if (exportPreview && !o.showMask && !o.pickSource) {
+            const scale = Math.min(1, 640 / Math.max(size.width, size.height));
+            exportPreview.width = Math.round(size.width * scale);
+            exportPreview.height = Math.round(size.height * scale);
+            exportPreview.getContext("2d").drawImage(stage, 0, 0, exportPreview.width, exportPreview.height);
+          }
         } else dirty.current = true;
         average = average * 0.75 + rendered.elapsed * 0.25;
         if (moving && o.previewSize === "auto") {

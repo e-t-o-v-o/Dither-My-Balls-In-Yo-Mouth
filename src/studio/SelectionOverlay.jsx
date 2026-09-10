@@ -1,6 +1,7 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 export function SelectionOverlay({
   tool,
+  navigation,
   config,
   setConfig,
   radius,
@@ -9,6 +10,16 @@ export function SelectionOverlay({
 }) {
   const canvasRef = useRef(),
     path = useRef(null);
+  const clear = () => {
+    path.current = null;
+    const canvas = canvasRef.current;
+    canvas?.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  };
+  useEffect(() => {
+    if (!navigation) return;
+    navigation.current.cancelSelection = clear;
+    return () => { navigation.current.cancelSelection = null; };
+  }, [navigation]);
   const point = (event) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     return [
@@ -55,7 +66,7 @@ export function SelectionOverlay({
         tool === "pick" ? "Pick a source color" : "Draw selection on preview"
       }
       onPointerDown={(event) => {
-        if (event.button !== 0) return;
+        if (event.button !== 0 || navigation?.current.active) return;
         const p = point(event);
         if (tool === "pick") {
           onPick(p);
@@ -66,6 +77,7 @@ export function SelectionOverlay({
         draw();
       }}
       onPointerMove={(event) => {
+        if (navigation?.current.active) { clear(); return; }
         if (!path.current) return;
         const p = point(event),
           last = path.current.at(-1);
@@ -74,6 +86,7 @@ export function SelectionOverlay({
         draw();
       }}
       onPointerUp={(event) => {
+        if (navigation?.current.active) { clear(); return; }
         if (!path.current) return;
         const points = path.current.map(([x, y]) => [
           config.cropX + x * config.cropWidth,

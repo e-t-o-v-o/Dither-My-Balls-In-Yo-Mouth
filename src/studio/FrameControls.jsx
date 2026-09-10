@@ -1,6 +1,7 @@
 import React from "react";
 import { Range } from "./Controls";
 import { cropToAspect } from "./framing";
+import { TimeField } from "./TimeField";
 export function FrameControls({
   config: c,
   source,
@@ -9,11 +10,13 @@ export function FrameControls({
   time,
   changeTrim,
   setTrim,
+  onEditCrop,
 }) {
   return (
     <>
       <section className="inspector-section">
         <h2>Framing</h2>
+        <button className="full" onClick={onEditCrop}>Edit crop on image</button>
         <div
           className="segmented wrap"
           role="group"
@@ -69,28 +72,25 @@ export function FrameControls({
             {source.kind === "camera" ? "Recording length" : "Precise trim"}
           </h2>
           {(source.kind === "camera" ? [1] : [0, 1]).map((index) => (
-            <label key={index}>
-              {source.kind === "camera" ? "Length" : index ? "Out" : "In"}
-              <input
-                aria-label={
+            <div className="frame-trim-row" key={index}>
+              <TimeField
+                caption={source.kind === "camera" ? "Length" : index ? "Out" : "In"}
+                label={
                   source.kind === "camera"
                     ? "Recording length"
                     : `Frame trim ${index ? "out" : "in"}`
                 }
-                type="number"
                 min={index ? trim[0] + 0.05 : 0}
                 max={index ? source.duration || 300 : trim[1] - 0.05}
-                step="0.01"
-                value={Number(trim[index].toFixed(2))}
-                onChange={(e) => changeTrim(index, e.target.value)}
+                value={trim[index]}
+                onCommit={(value) => changeTrim(index, value)}
               />
-              <span>s</span>
               {source.kind !== "camera" && (
                 <button onClick={() => changeTrim(index, time)}>
                   Set here
                 </button>
               )}
-            </label>
+            </div>
           ))}
           {source.kind !== "camera" && (
             <button onClick={() => setTrim([0, source.duration])}>
