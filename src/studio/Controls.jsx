@@ -418,10 +418,10 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
       </Dialog>}
       <section className="inspector-section effect-adjustments">
         <Range
-          label="Cell size"
+          label={c.effect === "interlace" ? "Module size" : "Cell size"}
           value={c.cellSize}
           min={
-            c.effect === "screenprint"
+            ["screenprint", "interlace"].includes(c.effect)
               ? 8
               : ["beads", "contour-type"].includes(c.effect)
                 ? 6
@@ -434,6 +434,29 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           Smaller cells preserve more detail. The pattern scales with your
           export.
         </p>
+
+        {c.effect === "interlace" && (
+          <>
+            <Select label="Structure" value={c.weavePattern} onChange={(v) => set("weavePattern", v)}>
+              <option value="weave">Weave · interlocking crossings</option>
+              <option value="bands">Bands · long color runs</option>
+              <option value="steps">Ribbons · stepped turns</option>
+            </Select>
+            <Range label="Image detail" value={c.weaveDetail * 100} min={0} max={100} unit="%" onChange={(v) => set("weaveDetail", v / 100)} />
+            <p className="hint">Lower detail builds larger color fields. Higher detail keeps the subject clearer.</p>
+            <Select label="Color mapping" value={c.weaveColorMode} onChange={(v) => set("weaveColorMode", v)}>
+              <option value="source">Source colors</option>
+              <option value="tone">Tonal inks · expressive color</option>
+            </Select>
+            <details className="inspector-section">
+              <summary>Pattern details</summary>
+              <Range label="Thread width" value={c.weaveWidth * 100} min={20} max={80} unit="%" onChange={(v) => set("weaveWidth", v / 100)} />
+              {c.weavePattern !== "bands" && <Range label="Crossings" value={c.weaveCrossings * 100} min={0} max={100} unit="%" onChange={(v) => set("weaveCrossings", v / 100)} />}
+              <Range label="Pattern seed" value={c.weaveSeed} min={0} max={99} onChange={(v) => set("weaveSeed", v)} />
+              <p className="hint">The seed keeps the weave fixed throughout a video. Choose your inks in Color.</p>
+            </details>
+          </>
+        )}
 
         {["ascii", "dither-ascii"].includes(c.effect) && (
           <Select
@@ -863,14 +886,14 @@ export function ColorControls({
             ))}
           </Select>
           <div className="palette-grid">
-            {[
+            {(c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : [
               "Paper",
               "Phosphor",
               "Amber",
               "Electric",
               "Vaporwave Aurora",
               "Brutalist Neon Clash",
-            ].map((p) => (
+            ]).map((p) => (
               <button
                 key={p}
                 className={

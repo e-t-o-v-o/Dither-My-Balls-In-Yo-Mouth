@@ -31,8 +31,15 @@ export const effectKeys = [
   "inkSpread",
   "registration",
   "screenMode",
+  "weavePattern",
+  "weaveDetail",
+  "weaveWidth",
+  "weaveCrossings",
+  "weaveSeed",
+  "weaveColorMode",
 ];
 export const effectDefaults = {
+  interlace: { cellSize: 32 },
   ascii: { cellSize: 14 },
   "dither-ascii": { cellSize: 14 },
   beads: { cellSize: 20 },
@@ -47,6 +54,7 @@ export const effectFamily = (id) =>
     ? "Utilities"
     : [
           "beads",
+          "interlace",
           "mosaic",
           "symbols",
           "halftone",

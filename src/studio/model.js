@@ -1,6 +1,9 @@
 import { charPalettes, paletteSets, asciiVariants, fonts } from "../constants";
 export { asciiVariants, fonts };
 export const palettes = {
+  "Loom primary": ["#191919", "#0070f6", "#ff0000", "#00af57", "#ff69a2", "#fbbb00"],
+  "Loom textile": ["#2d2d2d", "#99270d", "#2677d9", "#1ea963", "#e83014", "#ff6e26", "#aecce5", "#cecece", "#ffcf43", "#efe3da"],
+  "Loom nocturne": ["#060606", "#8c301b", "#d53d25", "#498e75", "#3175d5", "#e979ab", "#cececc"],
   Paper: ["#101215", "#f1f2e9"],
   Phosphor: ["#071912", "#315c36", "#8ca942", "#dbf69b"],
   Amber: ["#181108", "#744c1b", "#cd933e", "#ffe0a0"],
@@ -19,6 +22,12 @@ export const palettes = {
   ...paletteSets,
 };
 export const effects = [
+  [
+    "interlace",
+    "Interlace",
+    "16",
+    "Interlocking ink bands, woven crossings, and stepped ribbons shaped by your image.",
+  ],
   [
     "screenprint",
     "Screenprint",
@@ -170,8 +179,18 @@ export const defaults = {
   inkSpread: 1,
   registration: 0,
   screenMode: "cmyk",
+  weavePattern: "weave",
+  weaveDetail: 0.85,
+  weaveWidth: 0.5,
+  weaveCrossings: 0.7,
+  weaveSeed: 7,
+  weaveColorMode: "source",
 };
 const numeric = {
+  weaveDetail: [0, 1],
+  weaveWidth: [0.2, 0.8],
+  weaveCrossings: [0, 1],
+  weaveSeed: [0, 99],
   cropX: [0, 0.95],
   cropY: [0, 0.95],
   cropWidth: [0.05, 1],
@@ -272,6 +291,7 @@ export function sanitizeConfig(input = {}) {
   if (["beads", "contour-type"].includes(c.effect))
     c.cellSize = Math.max(6, c.cellSize);
   if (c.effect === "screenprint") c.cellSize = Math.max(8, c.cellSize);
+  if (c.effect === "interlace") c.cellSize = Math.max(8, c.cellSize);
   if (!methods.some(([id]) => id === c.method)) c.method = defaults.method;
   if (!Object.hasOwn(palettes, c.palette)) c.palette = defaults.palette;
   for (const k of [
@@ -296,6 +316,8 @@ export function sanitizeConfig(input = {}) {
     contourSource: ["luminance", "alpha"],
     maskMode: ["none", "luminance", "color", "manual", "matte"],
     screenMode: ["cmyk", "duotone"],
+    weavePattern: ["weave", "bands", "steps"],
+    weaveColorMode: ["source", "tone"],
     underlayMode: ["source", "palette"],
   }))
     if (!values.includes(c[key])) c[key] = defaults[key];
@@ -304,13 +326,14 @@ export function sanitizeConfig(input = {}) {
   c.cropHeight = Math.min(c.cropHeight, 1 - c.cropY);
   c.echoCount = Math.round(c.echoCount);
   c.contourLevels = Math.round(c.contourLevels);
+  c.weaveSeed = Math.round(c.weaveSeed);
   if (!Object.hasOwn(palettes, c.echoPalette))
     c.echoPalette = defaults.echoPalette;
   return c;
 }
 export function usesPalette(c) {
   return (
-    ["dither", "dither-ascii", "palette"].includes(c.effect) ||
+    ["dither", "dither-ascii", "palette", "interlace"].includes(c.effect) ||
     (c.effect === "ascii" &&
       (c.textColor === "palette" ||
         (c.underlay && c.underlayMode === "palette"))) ||
@@ -371,6 +394,33 @@ export function parsePresets(value) {
   return result;
 }
 export const looks = [
+  {
+    name: "Signal weave",
+    note: "Interlace / vivid ink bands",
+    config: {
+      ...defaults, effect: "interlace", palette: "Loom primary",
+      bgColor: "#191919", cellSize: 56, weaveDetail: 0.5,
+      weaveColorMode: "tone", weaveCrossings: 0.85,
+    },
+  },
+  {
+    name: "Color loom",
+    note: "Interlace / textile rhythm",
+    config: {
+      ...defaults, effect: "interlace", palette: "Loom textile",
+      bgColor: "#efe3da", cellSize: 32, weaveDetail: 0.8,
+      weaveColorMode: "tone", weaveSeed: 19, weaveCrossings: 0.45,
+    },
+  },
+  {
+    name: "Night ribbons",
+    note: "Interlace / folded geometry",
+    config: {
+      ...defaults, effect: "interlace", palette: "Loom nocturne",
+      bgColor: "#060606", cellSize: 56, weaveDetail: 0.6,
+      weavePattern: "steps", weaveColorMode: "tone", weaveSeed: 31,
+    },
+  },
   {
     name: "Overprint",
     note: "CMYK / offset screens",

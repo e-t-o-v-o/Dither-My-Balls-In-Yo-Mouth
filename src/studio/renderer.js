@@ -6,6 +6,7 @@ import { canvasBlob } from "./canvas";
 import { FinishingRenderer } from "./finishing";
 import { screenprint, contourType } from "./print-effects";
 import { GraphicRenderer } from "./graphics";
+import { InterlaceRenderer } from "./interlace";
 import { makeCanvas } from "./canvas";
 function resize(c, w, h) {
   if (c.width !== w) c.width = w;
@@ -63,6 +64,7 @@ export class FrameRenderer {
     this.glyphs = new Map();
     this.textLayer = makeCanvas();
     this.graphic = new GraphicRenderer();
+    this.interlace = new InterlaceRenderer();
     this.backdrop = makeCanvas();
     this.selection = new SelectionRenderer();
     this.finishing = new FinishingRenderer(this.selection);
@@ -184,7 +186,7 @@ export class FrameRenderer {
     const ctx = overrideContext || canvas.getContext("2d");
     const cell = Math.max(
       1,
-      ((c.effect === "beads" ? Math.max(6, c.cellSize) : c.cellSize) *
+      ((c.effect === "interlace" ? Math.max(8, c.cellSize) * 2 : c.effect === "beads" ? Math.max(6, c.cellSize) : c.cellSize) *
         Math.max(width, height)) /
         1920,
     );
@@ -234,7 +236,8 @@ export class FrameRenderer {
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, width, height);
     // Flatten the final composition without changing transparent effect semantics.
-    if ((!c.transparent || flatten) && !omitBackground) {
+    const interlaceBackground = c.effect === "interlace" && !overrideContext && !(c.maskMode !== "none" && c.maskBackdrop);
+    if ((!c.transparent || flatten) && !omitBackground && !interlaceBackground) {
       ctx.fillStyle = c.bgColor;
       ctx.fillRect(0, 0, width, height);
     }
@@ -244,6 +247,16 @@ export class FrameRenderer {
       bc.clearRect(0, 0, width, height);
       drawSource(source, bc, c, width, height);
       ctx.drawImage(this.backdrop, 0, 0, width, height);
+    }
+    if (c.effect === "interlace") {
+      this.interlace.render(ctx, data, w, h, c, width, height, palHex);
+      if (interlaceBackground && (!c.transparent || flatten) && !omitBackground) {
+        ctx.globalCompositeOperation = "destination-over";
+        ctx.fillStyle = c.bgColor;
+        ctx.fillRect(0, 0, width, height);
+        ctx.globalCompositeOperation = "source-over";
+      }
+      return canvas;
     }
     if (c.effect === "screenprint" || c.effect === "contour-type") {
       (c.effect === "screenprint" ? screenprint : contourType)(

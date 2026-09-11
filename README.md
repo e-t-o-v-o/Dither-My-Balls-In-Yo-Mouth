@@ -14,8 +14,9 @@ The app never uploads your media. Settings and named presets are stored locally,
 ## What is included
 
 - Six distinct color-aware dithering methods: Bayer, Floyd–Steinberg, Atkinson, Jarvis–Judice–Ninke, Burkes, and Sierra.
-- Fourteen focused effects: Screenprint, Contour type, Contour beads, Dot mosaic, Symbol field, Dither, ASCII, Palette, Threshold, Halftone, Crosshatch, Edges, Channel study, and Pixelate. Dither + ASCII is an ASCII mode, with legacy presets preserved. Graphic, Digital, and Utilities families keep the picker compact.
-- Fifteen style starters, including CMYK Overprint, Contour poetry, and Carbon echoes. Preview the current source frame across the entire style library on demand.
+- Fifteen focused effects: Interlace, Screenprint, Contour type, Contour beads, Dot mosaic, Symbol field, Dither, ASCII, Palette, Threshold, Halftone, Crosshatch, Edges, Channel study, and Pixelate. Dither + ASCII is an ASCII mode, with legacy presets preserved. Graphic, Digital, and Utilities families keep the picker compact.
+- Eighteen style starters, including Signal weave, Color loom, Night ribbons, CMYK Overprint, Contour poetry, and Carbon echoes. Preview the current source frame across the entire style library on demand.
+- Interlace reconstructs images and video with interlocking bands and stepped ribbons. Source-color and tonal-ink mapping, three reference-inspired palettes, and stable pattern seeds support both recognizable treatments and abstract graphic compositions.
 - Brightness/color selection, original-source eyedropper, paint/erase/lasso corrections, imported mattes, selection overlay, and optional original backdrop. Selection is manual or tonal; there is no automatic subject detection.
 - CMYK/duotone screens, contour lettering, fixed-time color echoes, effect/source mixing, and normalized paper grain.
 - Original palette and character-set collections. **Keep selection when changing looks** lets you try looks without losing a tuned selection.
@@ -43,6 +44,8 @@ npm run test:ci
 npm run build
 node scripts/check-gif-worker.cjs
 npm run test:exports # Requires ffmpeg / ffprobe
+node scripts/check-precise-export.mjs --interlace # Also checks Interlace MP4 / WebM
+node scripts/check-interlace.mjs # Render-only performance review
 npm run benchmark -- ebdbb2c
 npm audit
 ```
@@ -79,6 +82,7 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 - `src/studio/use-preview.js`, `render-service.js`, `render-worker.js`: adaptive preview, worker backpressure, and cancellable rendering.
 - `src/studio/selection.js`, `framing.js`: source-attached selections and shared framing.
 - `src/studio/print-effects.js`, `finishing.js`, `echo-sampler.js`: print/type treatments, compositing, and fixed media-time echo samples.
+- `src/studio/interlace.js`: deterministic loom layout and shared raster/vector ink geometry.
 - `src/studio/use-appearance.js`, `use-workspace.js`, `use-canvas-gestures.js`: appearance, adaptive layout, and view-only navigation.
 - `src/studio/CropEditor.jsx`, `crop-geometry.js`, `TimeField.jsx`: staged source framing and precise committed values.
 - `src/studio/Timeline.jsx`, `Filmstrip.jsx`, `StyleBrowser.jsx`: compact video controls and on-demand style previews.
@@ -105,3 +109,5 @@ See [Workflow review](docs/WORKFLOW-REVIEW.md) for v2.3 editing refinements and 
 See [Workspace v3](docs/WORKSPACE-V3.md) for the implementation, validation, and remaining platform limits.
 
 See [Design workspace](docs/DESIGN-WORKSPACE.md) for the responsive redesign, interaction decisions, and verification limits.
+
+See [Interlace](docs/INTERLACE.md) for the reference-inspired filter, controls, and validation.

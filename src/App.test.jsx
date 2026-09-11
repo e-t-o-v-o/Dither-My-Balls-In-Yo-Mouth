@@ -42,6 +42,25 @@ test("effect changes can be undone and redone", () => {
   fireEvent.click(screen.getByRole("button", { name: "Redo", exact: true }));
   expect(screen.getByRole("button", { name: "Change effect" })).toHaveTextContent("ASCII");
 });
+
+test("Interlace controls and per-effect settings remain available across effect changes", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Change effect" }));
+  fireEvent.click(screen.getByRole("button", { name: "Graphic", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Interlace", exact: true }));
+  expect(screen.getByRole("slider", { name: "Module size", exact: true })).toHaveValue("32");
+  fireEvent.change(screen.getByLabelText("Structure"), { target: { value: "steps" } });
+  fireEvent.change(screen.getByRole("slider", { name: "Image detail", exact: true }), { target: { value: "42" } });
+  fireEvent.click(screen.getByRole("button", { name: "Change effect" }));
+  fireEvent.click(screen.getByRole("button", { name: "Screenprint", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Change effect" }));
+  fireEvent.click(screen.getByRole("button", { name: "Interlace", exact: true }));
+  expect(screen.getByLabelText("Structure")).toHaveValue("steps");
+  expect(screen.getByRole("slider", { name: "Image detail", exact: true })).toHaveValue("42");
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Loom primary", exact: true }));
+  expect(screen.getByLabelText("Palette")).toHaveValue("Loom primary");
+});
 test("preset save and restore work without blocking prompts", () => {
   render(<App />);
   fireEvent.click(screen.getByRole("tab", { name: "Looks" }));

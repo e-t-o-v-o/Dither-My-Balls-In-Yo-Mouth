@@ -139,11 +139,13 @@ try {
     height: 180,
   };
   const results = [];
-  for (const format of ["mp4", "webm"]) {
+  const cases = [["mp4", "Overprint"], ["webm", "Carbon echoes"]];
+  if (process.argv.includes("--interlace")) cases.push(["mp4", "Signal weave"], ["webm", "Night ribbons"]);
+  for (const [format, lookName] of cases) {
     const config = {
       ...looks.find(
         (look) =>
-          look.name === (format === "mp4" ? "Overprint" : "Carbon echoes"),
+          look.name === lookName,
       ).config,
       ...(format === "mp4" ? { cropX: 0.21875, cropWidth: 0.5625 } : {}),
     };
