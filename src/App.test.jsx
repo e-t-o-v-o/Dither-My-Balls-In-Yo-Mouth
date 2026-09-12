@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import App from "./App";
 vi.mock("./studio/renderer", () => ({
   FrameRenderer: class {
@@ -14,12 +14,49 @@ beforeEach(() => {
     clearRect: () => {},
     drawImage: () => {},
   });
+  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/jpeg;base64,");
   HTMLDialogElement.prototype.showModal = function () {
     this.setAttribute("open", "");
   };
   HTMLDialogElement.prototype.close = function () {
     this.removeAttribute("open");
   };
+});
+afterEach(() => vi.unstubAllGlobals());
+
+test("MP4 is a visible choice, reaches the encoder explicitly, and is remembered", async () => {
+  vi.stubGlobal("VideoEncoder", class {});
+  const planner = await import("./studio/export-plan");
+  vi.spyOn(planner, "planVideoExport").mockResolvedValue({ extension: "mp4", codec: "avc", estimatedBytes: 1000 });
+  const exporter = await import("./studio/precise-export");
+  const encode = vi.spyOn(exporter, "exportPrecise").mockResolvedValue({ blob: new Blob(["fixture"], { type: "video/mp4" }), extension: "mp4", width: 1920, height: 1080, engine: "precise", codec: "avc", targetFps: 30 });
+  URL.createObjectURL = vi.fn(() => "blob:mp4");
+  URL.revokeObjectURL = vi.fn();
+  const first = render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Export", exact: true }));
+  fireEvent.click(screen.getByRole("radio", { name: "MP4", exact: true }));
+  expect(screen.getByRole("radio", { name: "MP4", exact: true })).toBeChecked();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Create export" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Create export" }));
+  expect(await screen.findByRole("link", { name: "Download MP4" })).toHaveAttribute("download", expect.stringMatching(/\.mp4$/));
+  expect(encode.mock.calls[0][0].format).toBe("mp4");
+  first.unmount();
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Export", exact: true }));
+  expect(screen.getByRole("radio", { name: "MP4", exact: true })).toBeChecked();
+});
+
+test("an unavailable remembered MP4 stays explicit and cannot silently export WebM", () => {
+  vi.stubGlobal("MediaRecorder", { isTypeSupported: mime => mime.startsWith("video/webm") });
+  localStorage.setItem("dither.file-type.v1", JSON.stringify("mp4"));
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Export", exact: true }));
+  expect(screen.getByRole("radio", { name: "MP4", exact: true })).toBeChecked();
+  expect(screen.getByRole("radio", { name: "MP4", exact: true })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Create export" })).toBeDisabled();
+  expect(screen.getByText(/MP4 is unavailable/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("radio", { name: "WebM", exact: true }));
+  expect(screen.getByRole("button", { name: "Create export" })).toBeEnabled();
 });
 test("opens directly into a usable studio with no camera permission request", () => {
   const camera = vi.fn();
@@ -145,9 +182,7 @@ test("export offers current-frame formats and explicit dimensions", () => {
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "Export", exact: true }));
   const dialog = screen.getByRole("dialog");
-  fireEvent.change(within(dialog).getByLabelText("Format"), {
-    target: { value: "png" },
-  });
+  fireEvent.click(within(dialog).getByRole("radio", { name: "PNG", exact: true }));
   expect(within(dialog).getByText("1920 × 1080")).toBeInTheDocument();
   expect(
     within(dialog).getByRole("button", { name: "Create frame" }),
@@ -169,12 +204,11 @@ test("switching out of GIF restores valid video resolution and frame rate", () =
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "Export", exact: true }));
   const dialog = screen.getByRole("dialog");
-  const format = within(dialog).getByLabelText("Format");
-  fireEvent.change(format, { target: { value: "gif" } });
+  fireEvent.click(within(dialog).getByRole("radio", { name: "GIF", exact: true }));
   expect(
     within(dialog).getByLabelText("Resolution · longest edge"),
   ).toHaveValue("480");
-  fireEvent.change(format, { target: { value: "png" } });
+  fireEvent.click(within(dialog).getByRole("radio", { name: "PNG", exact: true }));
   expect(
     within(dialog).getByLabelText("Resolution · longest edge"),
   ).toHaveValue("1920");
@@ -207,13 +241,9 @@ test("video resolution survives a GIF detour and a new session", () => {
   fireEvent.change(screen.getByLabelText("Resolution · longest edge"), {
     target: { value: "1280" },
   });
-  fireEvent.change(screen.getByLabelText("Format"), {
-    target: { value: "gif" },
-  });
+  fireEvent.click(screen.getByRole("radio", { name: "GIF", exact: true }));
   expect(screen.getByLabelText("Resolution · longest edge")).toHaveValue("480");
-  fireEvent.change(screen.getByLabelText("Format"), {
-    target: { value: "auto" },
-  });
+  fireEvent.click(screen.getByRole("radio", { name: "Auto", exact: true }));
   expect(screen.getByLabelText("Resolution · longest edge")).toHaveValue(
     "1280",
   );
@@ -247,9 +277,7 @@ test("a completed export remains downloadable and is labeled when later settings
   URL.revokeObjectURL = vi.fn();
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "Export", exact: true }));
-  fireEvent.change(screen.getByLabelText("Format"), {
-    target: { value: "png" },
-  });
+  fireEvent.click(screen.getByRole("radio", { name: "PNG", exact: true }));
   fireEvent.click(screen.getByRole("button", { name: "Create frame" }));
   expect(
     await screen.findByRole("link", { name: "Download PNG" }),

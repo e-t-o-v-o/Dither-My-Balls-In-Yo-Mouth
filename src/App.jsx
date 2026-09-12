@@ -32,6 +32,7 @@ import { Dialog } from "./studio/Dialog";
 import { StyleBrowser } from "./studio/StyleBrowser";
 import { Timeline } from "./studio/Timeline";
 import { ProjectDownload } from "./studio/ProjectDownload";
+import { ExportFormat } from "./studio/ExportFormat";
 import { CropEditor } from "./studio/CropEditor";
 import { FrameControls } from "./studio/FrameControls";
 import {
@@ -162,7 +163,10 @@ function App() {
     videoPreferences(readStorage("dither.video.v1", null)),
   );
   const videoSettings = useRef(exportDefaults);
-  const [format, setFormat] = useState("auto"),
+  const [format, setFormat] = useState(() => {
+      const saved = readStorage("dither.file-type.v1", "auto");
+      return ["auto", "mp4", "webm"].includes(saved) ? saved : "auto";
+    }),
     [resolution, setResolution] = useState(exportDefaults.resolution),
     [fps, setFps] = useState(
       hasPreciseExport()
@@ -202,6 +206,20 @@ function App() {
           { id: "webm", label: "WEBM" },
         ]
       : liveFormats;
+  const unavailableFormat = ["mp4", "webm"].includes(format) && !formats.some(f => f.id === format);
+  const chooseFormat = (next) => {
+    setFormat(next);
+    if (["auto", "mp4", "webm"].includes(next))
+      writeStorage("dither.file-type.v1", next);
+    if (next === "gif") {
+      setFps(12);
+      setResolution("480");
+    } else if (format === "gif" ||
+      (["png", "svg"].includes(format) && ["auto", "mp4", "webm"].includes(next))) {
+      setFps(usePrecise ? videoSettings.current.fps : Math.min(30, videoSettings.current.fps));
+      setResolution(videoSettings.current.resolution);
+    }
+  };
   const set = useCallback((key, value) => {
     if (key === "effect") dispatch({ type: "effect", value });
     else if (key === "effect-reset") dispatch({ type: "effect-reset", value });
@@ -1575,47 +1593,8 @@ function App() {
               </span>
             </div>
             <fieldset className="control-fieldset" disabled={busy}>
+              <ExportFormat value={format} onChange={chooseFormat} kind={source.kind} formats={formats} />
               <div className="export-grid">
-                <Select
-                  label="Format"
-                  value={format}
-                  onChange={(v) => {
-                    setFormat(v);
-                    if (v === "gif") {
-                      setFps(12);
-                      setResolution("480");
-                    } else {
-                      if (
-                        format === "gif" ||
-                        (["png", "svg"].includes(format) &&
-                          ["auto", "mp4", "webm"].includes(v))
-                      ) {
-                        setFps(
-                          usePrecise
-                            ? videoSettings.current.fps
-                            : Math.min(30, videoSettings.current.fps),
-                        );
-                        setResolution(videoSettings.current.resolution);
-                      }
-                    }
-                  }}
-                >
-                  {source.kind !== "image" && (
-                    <>
-                      <option value="auto">Video · best available</option>
-                      {formats.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.label} video
-                        </option>
-                      ))}
-                      {source.kind !== "camera" && (
-                        <option value="gif">Animated GIF</option>
-                      )}
-                    </>
-                  )}
-                  <option value="png">PNG · current frame</option>
-                  <option value="svg">SVG · vector frame</option>
-                </Select>
                 <Select
                   label="Resolution · longest edge"
                   value={resolution}
@@ -1657,8 +1636,8 @@ function App() {
                 <span>
                   {format === "auto"
                     ? usePrecise
-                      ? "Auto codec"
-                      : formats[0]?.label || "Video encoder unavailable"
+                      ? exportPlan?.extension ? `Auto → ${exportPlan.extension.toUpperCase()}` : "Auto · checking file type"
+                      : formats[0] ? `Auto → ${formats[0].label}` : "Video encoder unavailable"
                     : format.toUpperCase()}
                 </span>
               </div>
@@ -1679,6 +1658,8 @@ function App() {
                   exports redraw the effect geometry at the selected size.
                 </p>
               )}
+              {unavailableFormat && <p className="inline-error" role="status">{format.toUpperCase()} is unavailable in this browser’s current export mode. Choose another file type or export mode.</p>}
+              {format === "auto" && <p className="hint">Auto chooses a supported MP4 or WebM file. Select MP4 above if you need an .mp4 download.</p>}
               {exportPlan && (
                 <p
                   className={
@@ -1692,6 +1673,11 @@ function App() {
                       `${exportPlan.extension.toUpperCase()} · approximately ${(exportPlan.estimatedBytes / 1024 / 1024).toFixed(1)} MB · Ready to export`}
                 </p>
               )}
+              {format === "mp4" && exportPlan?.error && liveFormats.some(f => f.id === "mp4") && (
+                <button className="full" onClick={() => { setEngine("live"); setFps(value => Math.min(30, value)); }}>
+                  Try MP4 with live recording
+                </button>
+              )}
               <button
                 className="primary full export-button"
                 onClick={startExport}
@@ -1699,6 +1685,7 @@ function App() {
                   busy ||
                   !!exportPlan?.checking ||
                   !!exportPlan?.error ||
+                  unavailableFormat ||
                   (!["png", "svg", "gif"].includes(format) && !formats.length)
                 }
               >
