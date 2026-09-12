@@ -16,7 +16,7 @@ vi.mock("mediabunny", () => ({
 vi.mock("./media", async (importOriginal) => ({
   ...(await importOriginal()),
   createVideoElement: () => createCanvas(640, 360),
-  waitForMedia: async () => {},
+  loadVideo: async () => {},
   seek: vi.fn(async () => {}),
   releaseSource: vi.fn(),
 }));

@@ -3,7 +3,7 @@ import { drawSignal } from "./renderer";
 import {
   checkAbort,
   createVideoElement,
-  waitForMedia,
+  loadVideo,
   seek,
   releaseSource,
 } from "./media";
@@ -33,34 +33,51 @@ export class EchoSampler {
       this.source.kind === "camera"
     )
       return [];
+    const times = echoTimes(time, config.echoCount, config.echoSpacing);
+    // At the start of a clip there is no history yet. Do not open a second
+    // decoder (or block the first preview) until there is a frame to sample.
+    if (!times.length) return [];
     if (this.source.kind === "video" && !this.sink) {
-      const m = await import("mediabunny");
-      checkAbort(signal);
-      this.input = new m.Input({
-        source: new m.BlobSource(this.source.file),
-        formats: m.ALL_FORMATS,
-      });
-      const track = await this.input.getPrimaryVideoTrack();
-      if (track && (await track.canDecode())) {
-        this.sink = new m.CanvasSink(track, {
-          width: Math.max(
-            1,
-            Math.round(
-              (480 * this.source.width) /
-                Math.max(this.source.width, this.source.height),
-            ),
-          ),
-          alpha: true,
-          poolSize: 2,
+      try {
+        const m = await import("mediabunny");
+        checkAbort(signal);
+        checkAbort(this.controller.signal);
+        this.input = new m.Input({
+          source: new m.BlobSource(this.source.file),
+          formats: m.ALL_FORMATS,
         });
-      } else {
-        this.input.dispose();
+        const track = await this.input.getPrimaryVideoTrack();
+        if (track && (await track.canDecode())) {
+          this.sink = new m.CanvasSink(track, {
+            width: Math.max(
+              1,
+              Math.round(
+                (480 * this.source.width) /
+                  Math.max(this.source.width, this.source.height),
+              ),
+            ),
+            alpha: true,
+            poolSize: 2,
+          });
+        }
+      } catch (error) {
+        this.input?.dispose();
         this.input = null;
+        checkAbort(signal);
+        checkAbort(this.controller.signal);
+        // The native player may support a container/codec that WebCodecs does
+        // not. Use the same frame loader as import instead of losing echoes.
+      }
+      if (!this.sink) {
+        this.input?.dispose();
+        this.input = null;
+        checkAbort(signal);
+        checkAbort(this.controller.signal);
+        if (this.video) releaseSource({ element: this.video, url: this.url });
         this.video = createVideoElement();
-        const ready = waitForMedia(this.video, "loadeddata", signal);
-        this.video.src =
-          this.source.url || (this.url = URL.createObjectURL(this.source.file));
-        await ready;
+        await loadVideo(this.video,
+          this.source.url || (this.url = URL.createObjectURL(this.source.file)),
+          signal);
         this.sink = {
           getCanvas: async (at) => {
             await seek(this.video, at, signal);
@@ -71,7 +88,7 @@ export class EchoSampler {
       checkAbort(this.controller.signal);
     }
     const frames = [];
-    for (const at of echoTimes(time, config.echoCount, config.echoSpacing)) {
+    for (const at of times) {
       checkAbort(signal);
       let canvas = this.cache.get(at);
       if (!canvas) {

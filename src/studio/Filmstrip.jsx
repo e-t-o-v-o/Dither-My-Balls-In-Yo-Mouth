@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { AdjustmentContext } from "./Controls";
-import { createVideoElement, waitForMedia, seek, releaseSource } from "./media";
+import { createVideoElement, loadVideo, seek, releaseSource } from "./media";
 import { drawSignal } from "./renderer";
 export function Filmstrip({ source, trim, changeTrim, disabled, interactive = true }) {
   const adjustment = useContext(AdjustmentContext);
@@ -23,9 +23,7 @@ export function Filmstrip({ source, trim, changeTrim, disabled, interactive = tr
       try {
         if (source.kind === "video") {
           video = createVideoElement();
-          const ready = waitForMedia(video, "loadeddata", controller.signal);
-          video.src = source.url;
-          await ready;
+          await loadVideo(video, source.url, controller.signal);
         }
         const canvas = document.createElement("canvas"),
           signal = document.createElement("canvas");

@@ -3,6 +3,7 @@ import App from "./App";
 vi.mock("./studio/renderer", () => ({
   FrameRenderer: class {
     invalidate() {}
+    setMatte() {}
     render() {}
   },
   drawSignal: () => ({}),
@@ -328,4 +329,50 @@ test("crop edits are staged until Apply and one undo restores the original frame
   expect(screen.getByLabelText("Horizontal position exact value")).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
   expect(screen.getByLabelText("Horizontal position exact value")).toBeDisabled();
+});
+
+test("Enable video resumes the pending import and opens a paused, editable video", async () => {
+  const media = await import("./studio/media");
+  const video = document.createElement("video");
+  video.pause = vi.fn();
+  video.load = vi.fn();
+  const resume = vi.fn();
+  URL.revokeObjectURL = vi.fn();
+  const file = new File(["fixture"], "phone.mov", { type: "video/quicktime" });
+  vi.spyOn(media, "loadFile").mockImplementationOnce((received, signal, options) => new Promise(resolve => {
+    options.onPlaybackRequired(() => {
+      resume();
+      resolve({ kind: "video", file: received, name: received.name, element: video, url: "blob:phone", width: 1080, height: 1920, duration: 4 });
+    });
+  }));
+  render(<App />);
+  fireEvent.change(screen.getByLabelText("Choose image or video"), { target: { files: [file] } });
+  expect(await screen.findByRole("button", { name: "Enable video" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Export", exact: true })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Enable video" }));
+  expect(resume).toHaveBeenCalledOnce();
+  expect(await screen.findByText("phone.mov")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Enable video" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Play", exact: true })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Export", exact: true })).toBeEnabled();
+  expect(screen.getByLabelText("Video playhead")).toHaveValue("0");
+});
+
+test("cancelling a slow import restores the workspace without discarding the current effect", async () => {
+  const media = await import("./studio/media");
+  let signal;
+  vi.spyOn(media, "loadFile").mockImplementationOnce((file, abortSignal) => new Promise((_, reject) => {
+    signal = abortSignal;
+    signal.addEventListener("abort", () => reject(new DOMException("Cancelled", "AbortError")), { once: true });
+  }));
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Change effect" }));
+  fireEvent.click(screen.getByRole("button", { name: "ASCII", exact: true }));
+  fireEvent.change(screen.getByLabelText("Choose image or video"), { target: { files: [new File(["fixture"], "slow.mp4")] } });
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel", exact: true }));
+  expect(signal.aborted).toBe(true);
+  expect(await screen.findByRole("button", { name: "Open media", exact: true })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Project" })).toHaveTextContent("Test signal 01");
+  expect(screen.getByRole("button", { name: "Change effect" })).toHaveTextContent("ASCII");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });

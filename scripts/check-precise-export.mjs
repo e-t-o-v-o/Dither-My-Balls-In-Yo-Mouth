@@ -106,7 +106,7 @@ try {
     path.join(root, "src/studio/precise-export.js"),
     "export",
   );
-  const { defaults, looks } = await bundle(
+  const { defaults, looks, effects } = await bundle(
     path.join(root, "src/studio/model.js"),
     "model",
   );
@@ -143,12 +143,14 @@ try {
   if (process.argv.includes("--interlace")) cases.push(["mp4", "Signal weave"], ["webm", "Night ribbons"]);
   if (process.argv.includes("--artistic")) cases.push(["mp4", "Banknote"], ["webm", "Candy circuits"], ["mp4", "Paper garden"], ["webm", "Cathedral light"],
     ["mp4", "Agate bloom"], ["webm", "Chromatic atlas"], ["mp4", "Silk study"]);
+  if (process.argv.includes("--all-effects")) {
+    const covered = new Set(cases.map(([, name]) => looks.find(look => look.name === name).config.effect));
+    for (const [effect, name] of effects)
+      if (!covered.has(effect)) cases.push(["mp4", { name, config: { ...defaults, effect } }]);
+  }
   for (const [format, lookName] of cases) {
     const config = {
-      ...looks.find(
-        (look) =>
-          look.name === lookName,
-      ).config,
+      ...(typeof lookName === "string" ? looks.find(look => look.name === lookName) : lookName).config,
       ...(format === "mp4" ? { cropX: 0.21875, cropWidth: 0.5625 } : {}),
     };
     console.log(
@@ -197,17 +199,11 @@ try {
       "Trim is accurate within audio packet padding",
     );
     // Decode all frames and audio so a valid header alone cannot pass.
-    execFileSync("ffmpeg", [
-      "-v",
-      "error",
-      "-i",
-      file,
-      "-map",
-      "0:v:0",
-      "-f",
-      "null",
-      "-",
-    ]);
+    const checksums = execFileSync("ffmpeg", [
+      "-v", "error", "-i", file, "-map", "0:v:0", "-f", "framemd5", "-",
+    ], { encoding: "utf8" }).split("\n").filter(line => line && !line.startsWith("#"))
+      .map(line => line.split(",").at(-1).trim());
+    assert.ok(new Set(checksums).size > 1, `${config.effect} exports moving frames, not a frozen image`);
     const pcm = execFileSync("ffmpeg", [
       "-v",
       "error",

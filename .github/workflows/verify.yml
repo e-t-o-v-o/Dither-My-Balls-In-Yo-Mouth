@@ -18,7 +18,7 @@ jobs:
       - run: npm run build
       - run: node scripts/check-gif-worker.cjs
       - run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y ffmpeg)
-      - run: node scripts/check-precise-export.mjs --interlace --artistic
+      - run: node scripts/check-precise-export.mjs --interlace --artistic --all-effects
       - run: npm audit --audit-level=high
       - uses: actions/upload-artifact@v4
         with:
