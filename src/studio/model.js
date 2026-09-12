@@ -1,6 +1,8 @@
 import { charPalettes, paletteSets, asciiVariants, fonts } from "../constants";
 export { asciiVariants, fonts };
 export const palettes = {
+  "Mineral": ["#162f3a", "#27656d", "#559c91", "#b6c8a0", "#d79d62", "#b95c43", "#eee2c5"],
+  "Silk": ["#192441", "#39599a", "#528d9b", "#b36783", "#dc927c", "#e9bf77", "#f3e7cd"],
   "Gouache": ["#152b69", "#2257b8", "#25896b", "#d94d35", "#ee9689", "#efb63d", "#f4e6cb"],
   "Cathedral": ["#162335", "#4c345d", "#146974", "#3e8a9c", "#ba5846", "#d5a353", "#d2ddd0"],
   "Candy lacquer": ["#35234d", "#7550a6", "#e45b84", "#f2935c", "#6bbcae", "#f3ce61", "#f6ead7"],
@@ -24,9 +26,13 @@ export const palettes = {
   ...charPalettes,
   ...paletteSets,
 };
-export const proceduralArtEffects = ["guilloche", "cut-paper", "glass", "arc-tiles"];
+export const materialArtEffects = ["marbling", "topography", "threadwork"];
+export const proceduralArtEffects = [...materialArtEffects, "guilloche", "cut-paper", "glass", "arc-tiles"];
 export const artisticEffects = [...proceduralArtEffects, "interlace", "screenprint", "contour-type", "beads", "symbols"];
 export const effects = [
+  ["marbling", "Marbled ink", "21", "Swirling ink ribbons carry the colors and tones of your image through a fluid, fixed composition."],
+  ["topography", "Contour atlas", "22", "Brightness becomes a landscape of nested color terraces or fine contour bands."],
+  ["threadwork", "Threadwork", "23", "Fine bundles of stitches turn with the image's edges, building a directional textile portrait."],
   ["guilloche", "Guilloché", "17", "Engraved wave fields reveal your image through the width of each flowing line."],
   ["cut-paper", "Cut paper", "18", "Organic leaves and petals cut from color, with open space and delicate veins."],
   ["glass", "Facet glass", "19", "An irregular mesh of colored shards with fine, adjustable seams."],
@@ -205,8 +211,27 @@ export const defaults = {
   glassGap: 0.06,
   arcBands: 2,
   arcWeight: 0.9,
+  marbleSwirl: 0.65,
+  marbleWeight: 0.85,
+  topoLevels: 8,
+  topoSoftness: 1,
+  topoStyle: "terraces",
+  topoContour: 0.18,
+  stitchLength: 0.9,
+  stitchWidth: 0.6,
+  stitchFollow: 0.85,
+  stitchStrands: 2,
 };
 const numeric = {
+  marbleSwirl: [0, 1],
+  marbleWeight: [0.1, 1],
+  topoLevels: [3, 16],
+  topoSoftness: [0, 3],
+  topoContour: [0.04, 0.6],
+  stitchLength: [0.3, 1],
+  stitchWidth: [0.15, 1],
+  stitchFollow: [0, 1],
+  stitchStrands: [1, 3],
   artSeed: [0, 99],
   engraveWarp: [0, 1],
   engraveWeight: [0.1, 1],
@@ -321,6 +346,7 @@ export function sanitizeConfig(input = {}) {
   if (c.effect === "screenprint") c.cellSize = Math.max(8, c.cellSize);
   if (c.effect === "interlace") c.cellSize = Math.max(8, c.cellSize);
   if (c.effect === "guilloche") c.cellSize = Math.max(8, c.cellSize);
+  if (materialArtEffects.includes(c.effect)) c.cellSize = Math.max(12, c.cellSize);
   if (["cut-paper", "glass", "arc-tiles"].includes(c.effect)) c.cellSize = Math.max(16, c.cellSize);
   if (!methods.some(([id]) => id === c.method)) c.method = defaults.method;
   if (!Object.hasOwn(palettes, c.palette)) c.palette = defaults.palette;
@@ -350,6 +376,7 @@ export function sanitizeConfig(input = {}) {
     weaveColorMode: ["source", "tone"],
     artColorMode: ["source", "palette", "tone", "ink"],
     paperShape: ["leaves", "petals"],
+    topoStyle: ["terraces", "isolines"],
     underlayMode: ["source", "palette"],
   }))
     if (!values.includes(c[key])) c[key] = defaults[key];
@@ -361,6 +388,9 @@ export function sanitizeConfig(input = {}) {
   c.weaveSeed = Math.round(c.weaveSeed);
   c.artSeed = Math.round(c.artSeed);
   c.arcBands = Math.round(c.arcBands);
+  c.topoLevels = Math.round(c.topoLevels);
+  c.topoSoftness = Math.round(c.topoSoftness);
+  c.stitchStrands = Math.round(c.stitchStrands);
   if (!Object.hasOwn(palettes, c.echoPalette))
     c.echoPalette = defaults.echoPalette;
   return c;
@@ -429,6 +459,36 @@ export function parsePresets(value) {
   return result;
 }
 export const looks = [
+  {
+    name: "Floating ink",
+    note: "Marbling / sumi-like currents",
+    config: { ...defaults, effect: "marbling", cellSize: 24, artColorMode: "ink", fgColor: "#233f46", bgColor: "#eee2c5", marbleSwirl: 0.75 },
+  },
+  {
+    name: "Agate bloom",
+    note: "Marbling / mineral ribbons",
+    config: { ...defaults, effect: "marbling", cellSize: 32, artColorMode: "tone", palette: "Mineral", bgColor: "#162f3a", marbleSwirl: 1, marbleWeight: 0.95, artSeed: 43 },
+  },
+  {
+    name: "Chromatic atlas",
+    note: "Contour atlas / sculpted color",
+    config: { ...defaults, effect: "topography", cellSize: 20, artColorMode: "tone", palette: "Mineral", bgColor: "#162f3a", topoLevels: 10, topoContour: 0.12 },
+  },
+  {
+    name: "Contour silk",
+    note: "Contour atlas / delicate isolines",
+    config: { ...defaults, effect: "topography", cellSize: 20, artColorMode: "tone", palette: "Silk", bgColor: "#192441", topoLevels: 14, topoStyle: "isolines", topoContour: 0.24, topoSoftness: 2 },
+  },
+  {
+    name: "Silk study",
+    note: "Threadwork / directional color",
+    config: { ...defaults, effect: "threadwork", cellSize: 36, artColorMode: "source", palette: "Silk", bgColor: "#192441", stitchStrands: 2, stitchWidth: 0.95, stitchLength: 1 },
+  },
+  {
+    name: "Indigo stitch",
+    note: "Threadwork / light on linen",
+    config: { ...defaults, effect: "threadwork", cellSize: 24, artColorMode: "ink", fgColor: "#f3e7cd", bgColor: "#192441", stitchStrands: 1, stitchWidth: 0.75, stitchFollow: 1, artSeed: 29 },
+  },
   {
     name: "Banknote",
     note: "Guilloché / fine flowing ink",

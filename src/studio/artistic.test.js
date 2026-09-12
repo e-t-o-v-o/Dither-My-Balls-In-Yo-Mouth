@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { createCanvas, ImageData, loadImage } from "@napi-rs/canvas";
 import { FrameRenderer, SVGContext } from "./renderer";
-import { defaults, looks, proceduralArtEffects, sanitizeConfig } from "./model";
+import { defaults, looks, proceduralArtEffects, materialArtEffects, sanitizeConfig } from "./model";
 
 beforeAll(() => {
   global.document = { createElement: () => createCanvas(1, 1) };
@@ -36,7 +36,7 @@ test.each(proceduralArtEffects)("%s has repeatable frame order, live source resp
   const output = createCanvas(480, 270), renderer = new FrameRenderer(), input = source();
   renderer.render(input, output, c, 480, 270, null, 12);
   const expected = pixels(output).slice();
-  renderer.render(input, output, { ...c, artSeed: 82 }, 480, 270, null, 30);
+  renderer.render(input, output, { ...c, artSeed: 82, topoLevels: 4 }, 480, 270, null, 30);
   expect(pixels(output)).not.toEqual(expected);
   const different = createCanvas(480, 270);
   different.getContext("2d").fillStyle = "#ff0d30";
@@ -54,16 +54,20 @@ test.each(proceduralArtEffects)("%s preserves empty areas and does not compound 
   const input = source(0.5), ctx = input.getContext("2d");
   ctx.clearRect(0, 0, 200, 270);
   const c = { ...looks.find(look => look.config.effect === effect).config, transparent: true, engraveWeight: 1, paperFill: 1, glassGap: 0, glassScatter: 1, arcWeight: 1, arcBands: 4 };
-  const output = createCanvas(480, 270);
-  new FrameRenderer().render(input, output, c, 480, 270);
+  const output = createCanvas(480, 270), renderer = new FrameRenderer();
+  renderer.render(input, output, c, 480, 270);
   expect(output.getContext("2d").getImageData(30, 135, 1, 1).data[3]).toBe(0);
   const a = pixels(output);
   let max = 0;
   for (let i = 3; i < a.length; i += 4) max = Math.max(max, a[i]);
   expect(max).toBeGreaterThan(110);
-  // Different inks meet at shared vertices. Native tessellation rounds a few
-  // edge pixels by two alpha levels; overlapping half-opacity pieces reach 192.
-  expect(max).toBeLessThanOrEqual(130);
+  const sampled = pixels(renderer.sample);
+  let sampledMax = 0;
+  for (let i = 3; i < sampled.length; i += 4) sampledMax = Math.max(sampledMax, sampled[i]);
+  // High-quality source resampling can ring slightly at a hard alpha edge.
+  // Compare to that actual input, plus three levels for native path rounding.
+  // Compounding half-opacity marks would reach 192 and must still fail.
+  expect(max).toBeLessThanOrEqual(sampledMax + 3);
 });
 
 test("single-ink glass retains tonal information instead of producing a solid mesh", () => {
@@ -96,4 +100,51 @@ test("source-color glass preserves eight-bit color values", () => {
 test("artistic imports reject invalid structures and bound expensive detail settings", () => {
   expect(sanitizeConfig({ effect: "arc-tiles", cellSize: 0, artSeed: 12.8, arcBands: 999, arcWeight: -4, artColorMode: "bogus", paperShape: "bogus", glassGap: 9 }))
     .toMatchObject({ effect: "arc-tiles", cellSize: 16, artSeed: 13, arcBands: 4, arcWeight: 0.1, artColorMode: "palette", paperShape: "leaves", glassGap: 0.2 });
+});
+
+test.each(materialArtEffects)("%s bounds opacity at maximum detail, with repeatable landscape and portrait compositions", effect => {
+  for (const [width, height] of [[360, 240], [240, 360]]) for (const artSeed of [0, 43, 99]) {
+    const input = createCanvas(width, height), output = createCanvas(width, height), ctx = input.getContext("2d");
+    ctx.fillStyle = "rgba(185,130,60,0.5)"; ctx.fillRect(0, 0, width, height);
+    const c = sanitizeConfig({ ...defaults, effect, transparent: true, cellSize: 12, artColorMode: "source", artSeed,
+      marbleSwirl: 1, marbleWeight: 1, topoLevels: 16, topoContour: 0.04, stitchLength: 1, stitchWidth: 1, stitchStrands: 3 });
+    new FrameRenderer().render(input, output, c, width, height);
+    const a = pixels(output);
+    let max = 0;
+    for (let i = 3; i < a.length; i += 4) max = Math.max(max, a[i]);
+    expect(max).toBeGreaterThan(32); // Fine filaments can be narrower than a pixel.
+    expect(max).toBeLessThanOrEqual(130);
+  }
+});
+
+test("contour terraces preserve white plateaus at the top of the tone range", () => {
+  const input = createCanvas(320, 240), output = createCanvas(320, 240);
+  input.getContext("2d").fillStyle = "#fff";
+  input.getContext("2d").fillRect(0, 0, 320, 240);
+  for (const artColorMode of ["source", "tone", "ink"]) {
+    new FrameRenderer().render(input, output, { ...defaults, effect: "topography", cellSize: 16, artColorMode, transparent: true }, 320, 240);
+    const center = output.getContext("2d").getImageData(150, 110, 1, 1).data;
+    expect(center[3]).toBe(255);
+    expect(center[0]).toBeGreaterThan(230);
+  }
+});
+
+test("threadwork retains full eight-bit source colors", () => {
+  const input = createCanvas(480, 320), output = createCanvas(480, 320);
+  input.getContext("2d").fillStyle = "#fa071d";
+  input.getContext("2d").fillRect(0, 0, 480, 320);
+  new FrameRenderer().render(input, output, { ...defaults, effect: "threadwork", cellSize: 40, artColorMode: "source", transparent: true, stitchWidth: 1 }, 480, 320);
+  const a = pixels(output);
+  let solid = 0;
+  for (let i = 0; i < a.length; i += 4) if (a[i + 3] === 255) {
+    expect(Array.from(a.slice(i, i + 3))).toEqual([250, 7, 29]);
+    if (++solid === 20) break;
+  }
+  expect(solid).toBe(20);
+});
+
+test("material imports bound geometry cost and sanitize each control", () => {
+  expect(sanitizeConfig({ effect: "threadwork", cellSize: 2, stitchStrands: 99, stitchFollow: -1, stitchLength: 8,
+    topoLevels: 99, topoSoftness: 2.8, topoStyle: "bogus", marbleSwirl: 9 }))
+    .toMatchObject({ cellSize: 12, stitchStrands: 3, stitchFollow: 0, stitchLength: 1, topoLevels: 16, topoSoftness: 3, topoStyle: "terraces", marbleSwirl: 1 });
 });

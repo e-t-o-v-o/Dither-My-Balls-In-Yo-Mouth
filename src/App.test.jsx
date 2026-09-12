@@ -106,6 +106,40 @@ test("Artistic is a keyboard-accessible collection with focused previews, contro
   fireEvent.keyDown(screen.getByRole("tab", { name: "Color", exact: true }), { key: "End" });
   expect(screen.getByRole("tab", { name: "Frame", exact: true })).toHaveFocus();
 });
+test("artistic search recovers from empty results and variations support undo", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  const search = screen.getByRole("searchbox", { name: "Find a look" });
+  fireEvent.change(search, { target: { value: "marbling" } });
+  expect(screen.getByText("2 styles")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Indigo stitch/ })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Technique"), { target: { value: "threadwork" } });
+  expect(screen.getByText("No matching looks")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Preview looks on this frame" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Show all looks" }));
+  expect(search).toHaveValue("");
+  fireEvent.change(search, { target: { value: "Floating ink" } });
+  fireEvent.click(screen.getByRole("button", { name: /Floating ink/ }));
+  expect(screen.getByLabelText("Swirl depth")).toBeInTheDocument();
+  const seed = screen.getByLabelText("Pattern seed");
+  const initial = seed.value;
+  fireEvent.click(screen.getByRole("button", { name: "New variation" }));
+  expect(seed.value).not.toBe(initial);
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(seed.value).toBe(initial);
+});
+
+test("contour treatments expose meaningful controls without a disconnected seed", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  fireEvent.click(screen.getByRole("button", { name: /Chromatic atlas/ }));
+  expect(screen.queryByLabelText("Pattern seed")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Terrace separation")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Contour treatment"), { target: { value: "isolines" } });
+  expect(screen.getByLabelText("Contour coverage")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Terrace separation")).not.toBeInTheDocument();
+});
+
 test("export offers current-frame formats and explicit dimensions", () => {
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "Export", exact: true }));
