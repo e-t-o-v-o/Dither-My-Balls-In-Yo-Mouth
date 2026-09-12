@@ -8,6 +8,10 @@ beforeAll(() => {
   global.ImageData = ImageData;
 });
 const pixels = canvas => canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+// Native byte comparison keeps full-frame equality exact without walking
+// half a million typed-array properties through the assertion formatter.
+const samePixels = (a, b) => Buffer.from(a.buffer, a.byteOffset, a.byteLength)
+  .equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength));
 function source(alpha = 1) {
   const input = createCanvas(480, 270), ctx = input.getContext("2d");
   const gradient = ctx.createLinearGradient(0, 0, 480, 270);
@@ -37,17 +41,17 @@ test.each(proceduralArtEffects)("%s has repeatable frame order, live source resp
   renderer.render(input, output, c, 480, 270, null, 12);
   const expected = pixels(output).slice();
   renderer.render(input, output, { ...c, artSeed: 82, topoLevels: 4 }, 480, 270, null, 30);
-  expect(pixels(output)).not.toEqual(expected);
+  expect(samePixels(pixels(output), expected)).toBe(false);
   const different = createCanvas(480, 270);
   different.getContext("2d").fillStyle = "#ff0d30";
   different.getContext("2d").fillRect(0, 0, 480, 270);
   renderer.render(different, output, c, 480, 270, null, 3);
-  expect(pixels(output)).not.toEqual(expected);
+  expect(samePixels(pixels(output), expected)).toBe(false);
   renderer.render(input, output, c, 480, 270, null, 0);
-  expect(pixels(output)).toEqual(expected);
+  expect(samePixels(pixels(output), expected)).toBe(true);
   const cold = createCanvas(480, 270);
   new FrameRenderer().render(input, cold, c, 480, 270);
-  expect(pixels(output)).toEqual(pixels(cold));
+  expect(samePixels(pixels(output), pixels(cold))).toBe(true);
 });
 
 test.each(proceduralArtEffects)("%s preserves empty areas and does not compound a soft selection", effect => {
