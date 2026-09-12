@@ -1,28 +1,40 @@
 export function abortError() {
-  return new DOMException("Export cancelled.", "AbortError");
+  return new DOMException("Operation cancelled.", "AbortError");
 }
 export function checkAbort(signal) {
   if (signal?.aborted) throw abortError();
 }
-export function waitForMedia(element, event, signal, timeout = 20000) {
+function decodeError(element) {
+  return new Error(element.error?.code === 2
+    ? "The video file could not be read. Download it to your device, then open it again."
+    : "This file cannot be decoded by this browser. Try an H.264 MP4 video, PNG, or JPEG.");
+}
+
+export function waitForMedia(element, event, signal, timeout = 30000) {
   return new Promise((resolve, reject) => {
+    // Safari may provide a usable frame without firing loadeddata for a blob.
+    const frame = event === "loadeddata";
+    const events = frame
+      ? ["loadeddata", "canplay", "playing", "seeked", "timeupdate"]
+      : [event];
+    const isReady = () => frame
+      ? element.readyState >= 2 && !element.seeking
+      : event === "loadedmetadata" && element.readyState >= 1;
     const clean = () => {
       clearTimeout(timer);
-      element.removeEventListener(event, ok);
+      clearInterval(poll);
+      events.forEach((name) => element.removeEventListener(name, ok));
       element.removeEventListener("error", fail);
       signal?.removeEventListener("abort", abort);
     };
     const ok = () => {
+      if (frame && !isReady()) return;
       clean();
       resolve();
     };
     const fail = () => {
       clean();
-      reject(
-        new Error(
-          "This file cannot be decoded by this browser. Try H.264 MP4 video, PNG, or JPEG.",
-        ),
-      );
+      reject(decodeError(element));
     };
     const abort = () => {
       clean();
@@ -32,19 +44,24 @@ export function waitForMedia(element, event, signal, timeout = 20000) {
       clean();
       reject(
         new Error(
-          "The media took too long to load. Try a smaller file or a different codec.",
+          "The browser did not finish reading this file. If it is stored in iCloud or another cloud service, download it to your device and open it again.",
         ),
       );
     }, timeout);
-    element.addEventListener(event, ok, { once: true });
+    const poll = frame ? setInterval(() => { if (isReady()) ok(); }, 100) : null;
+    events.forEach((name) => element.addEventListener(name, ok));
     element.addEventListener("error", fail, { once: true });
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
+    else if (element.error) fail();
+    else if (isReady()) ok();
   });
 }
 export async function seek(video, time, signal) {
   checkAbort(signal);
-  const t = Math.max(0, Math.min(time, Math.max(0, video.duration - 0.001)));
+  const end = Number.isFinite(video.duration)
+    ? Math.max(0, video.duration - 0.001) : Infinity;
+  const t = Math.max(0, Math.min(time, end));
   if (
     Math.abs(video.currentTime - t) < 0.001 &&
     video.readyState >= 2 &&
@@ -54,12 +71,15 @@ export async function seek(video, time, signal) {
   const ready = waitForMedia(video, "seeked", signal);
   video.currentTime = t;
   await ready;
+  if (video.readyState < 2 || video.seeking)
+    await waitForMedia(video, "loadeddata", signal);
   checkAbort(signal);
 }
 export function createVideoElement() {
   const video = document.createElement("video");
   video.playsInline = true;
   video.muted = true;
+  video.defaultMuted = true;
   video.preload = "auto";
   video.tabIndex = -1;
   video.setAttribute("aria-hidden", "true");
@@ -75,8 +95,77 @@ export function createVideoElement() {
   document.body.appendChild(video);
   return video;
 }
-export async function loadFile(file, signal) {
+
+// Start decoding in the file-picker gesture, before awaiting metadata. On iOS,
+// preload alone can stop at HAVE_METADATA indefinitely, even for a local MP4.
+// Pause and rewind once the first real frame is available; never import playing.
+export async function loadVideo(video, url, signal, { onPlaybackRequired } = {}) {
+  checkAbort(signal);
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  let active = true, blocked = false, nudged = false, failure;
+  const nudge = () => {
+    if (!active || !blocked || nudged || video.readyState !== 1) return;
+    // Seeking also requests decoding when a power-saving policy rejects play().
+    if (video.duration > 0) {
+      nudged = true;
+      try { video.currentTime = Math.min(0.001, video.duration / 2); }
+      catch { /* The explicit Enable video action can still start decoding. */ }
+    }
+  };
+  const playFailed = (error) => {
+    if (!active || controller.signal.aborted || video.readyState >= 2) return;
+    if (error.name === "NotAllowedError") {
+      blocked = true;
+      nudge();
+      onPlaybackRequired?.(play);
+    } else if (error.name !== "AbortError") {
+      failure = decodeError(video);
+      controller.abort();
+    }
+  };
+  const play = () => {
+    if (!active || controller.signal.aborted) return;
+    try {
+      // Catch even late rejections after pause/abort. A playable first frame
+      // does not require the play promise itself to settle.
+      video.play()?.catch(playFailed);
+    } catch (error) { playFailed(error); }
+  };
+  video.addEventListener("loadedmetadata", nudge);
+  video.muted = video.defaultMuted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  const ready = waitForMedia(video, "loadeddata", controller.signal);
+  try {
+    video.src = url;
+    video.load();
+    play();
+    await ready;
+  } catch (error) {
+    if (signal?.aborted) throw abortError();
+    if (failure) throw failure;
+    if (blocked && error.name !== "AbortError")
+      throw new Error("Your browser paused video loading. Open the file again and tap Enable video to continue.");
+    throw error;
+  } finally {
+    active = false;
+    controller.abort();
+    // Also observe ready if assigning/loading the source failed synchronously.
+    ready.catch(() => {});
+    video.pause();
+    video.removeEventListener("loadedmetadata", nudge);
+    signal?.removeEventListener("abort", abort);
+    onPlaybackRequired?.(null);
+  }
+  await seek(video, 0, signal);
+}
+
+export async function loadFile(file, signal, options) {
+  checkAbort(signal);
   if (!file) throw new Error("Choose an image or video.");
+  if (!file.size) throw new Error("This file is empty. Download the original and open it again.");
   if (file.size > 2 * 1024 ** 3)
     throw new Error("Choose a file smaller than 2 GB.");
   const image =
@@ -89,14 +178,14 @@ export async function loadFile(file, signal) {
   const url = URL.createObjectURL(file),
     element = image ? new Image() : createVideoElement();
   try {
-    if (video) {
-      element.playsInline = true;
-      element.preload = "auto";
-      element.muted = true;
+    if (image) {
+      const ready = waitForMedia(element, "load", signal);
+      element.src = url;
+      await ready;
+    } else {
+      await loadVideo(element, url, signal, options);
     }
-    const ready = waitForMedia(element, image ? "load" : "loadeddata", signal);
-    element.src = url;
-    await ready;
+    checkAbort(signal);
     const width = image ? element.naturalWidth : element.videoWidth,
       height = image ? element.naturalHeight : element.videoHeight;
     if (!width || !height)
@@ -116,13 +205,7 @@ export async function loadFile(file, signal) {
       file,
     };
   } catch (e) {
-    if (video) {
-      element.pause();
-      element.removeAttribute("src");
-      element.load();
-      element.remove();
-    }
-    URL.revokeObjectURL(url);
+    releaseSource({ element, url });
     throw e;
   }
 }

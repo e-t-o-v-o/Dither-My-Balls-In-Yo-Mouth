@@ -11,6 +11,8 @@ A local video, image, and webcam effects studio. A canvas-centered workspace ada
 
 The app never uploads your media. Settings and named presets are stored locally, with validated JSON import/export for backups. Original media is unchanged. Project files and local autosaves also preserve framing, trim, selections, per-effect settings, and the active custom font. Relink the original media when reopening a project on another device. Fonts are embedded in SVG exports.
 
+Video import starts muted decoding and opens on a paused first frame. If the browser requires a gesture, choose **Enable video**; **Cancel** returns to the current workspace. Timeline thumbnails and compatibility-mode color echoes use the same video loader. Cloud-backed files must be available on your device, and input codecs still depend on browser support.
+
 ## What is included
 
 - Six distinct color-aware dithering methods: Bayer, Floyd–Steinberg, Atkinson, Jarvis–Judice–Ninke, Burkes, and Sierra.
@@ -46,6 +48,7 @@ npm run build
 node scripts/check-gif-worker.cjs
 npm run test:exports # Requires ffmpeg / ffprobe
 node scripts/check-precise-export.mjs --interlace # Also checks Interlace MP4 / WebM
+node scripts/check-precise-export.mjs --interlace --artistic --all-effects # Real decoded motion and audio through every effect
 node scripts/check-interlace.mjs # Render-only performance review
 npm run benchmark -- ebdbb2c
 npm audit

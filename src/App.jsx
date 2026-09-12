@@ -151,6 +151,7 @@ function App() {
   useEffect(() => { if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0; }, [tab]);
   const [notice, setNotice] = useState(null),
     [loading, setLoading] = useState(false),
+    [resumeVideo, setResumeVideo] = useState(null),
     [dialog, setDialog] = useState(null),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(0),
@@ -465,8 +466,17 @@ function App() {
     const controller = new AbortController();
     loadAbort.current = controller;
     setLoading(true);
+    setResumeVideo(null);
+    setNotice(null);
+    source.element?.pause?.();
+    setPlaying(false);
     try {
-      const next = await loadFile(file, controller.signal);
+      const next = await loadFile(file, controller.signal, {
+        onPlaybackRequired: (resume) => {
+          if (mounted.current && loadAbort.current === controller)
+            setResumeVideo(() => resume);
+        },
+      });
       if (controller.signal.aborted) {
         releaseSource(next);
         return;
@@ -478,10 +488,14 @@ function App() {
           "Animated GIF input is treated as an image. For editable motion, import a video.",
         );
     } catch (e) {
-      if (e.name !== "AbortError") alert(e.message, true);
+      if (mounted.current && loadAbort.current === controller && e.name !== "AbortError")
+        alert(e.message, true);
     } finally {
-      if (loadAbort.current === controller) setLoading(false);
-      if (fileInput.current) fileInput.current.value = "";
+      if (mounted.current && loadAbort.current === controller) {
+        setLoading(false);
+        setResumeVideo(null);
+        if (fileInput.current) fileInput.current.value = "";
+      }
     }
   };
   const openCamera = async () => {
@@ -497,6 +511,7 @@ function App() {
     loadAbort.current = controller;
     setLoading(true);
     let stream, video;
+    setResumeVideo(null);
     try {
       if (sourceRef.current?.kind === "camera") {
         sourceRef.current.element.srcObject
@@ -1036,7 +1051,7 @@ function App() {
           <button className="primary" onClick={showExport} disabled={loading || busy}><Icon name="download" /><span>Export</span></button>
         </div>
       </header>
-      <input ref={fileInput} hidden type="file" accept="image/*,video/*" onChange={(e) => openFile(e.target.files[0])} />
+      <input ref={fileInput} hidden aria-label="Choose image or video" type="file" accept="image/*,video/*,.mp4,.mov,.m4v,.webm,.ogv" onChange={(e) => openFile(e.target.files[0])} />
       <input
         hidden
         ref={projectInput}
@@ -1069,6 +1084,19 @@ function App() {
           >
             <Icon name="close" />
           </button>
+        </div>
+      )}
+      {loading && (
+        <div className="notice" role="status">
+          <span>{resumeVideo
+            ? "Your browser needs a tap to enable video."
+            : "Opening media…"}</span>
+          {resumeVideo && <button className="primary" onClick={resumeVideo}>Enable video</button>}
+          <button onClick={() => {
+            loadAbort.current?.abort();
+            setLoading(false);
+            setResumeVideo(null);
+          }}>Cancel</button>
         </div>
       )}
       <main id="workspace" className="workspace" data-tray={tray} data-layout={compact ? "compact" : "wide"} style={{ "--inspector-width": `${panelWidth}px` }}>
