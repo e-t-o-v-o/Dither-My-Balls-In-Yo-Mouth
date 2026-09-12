@@ -5,7 +5,7 @@ A local video, image, and webcam effects studio. A canvas-centered workspace ada
 ## Use the studio
 
 1. Open a video or image, enable the camera, or experiment with the built-in moving test signal.
-2. Choose a starter in **Looks**. Tune **Effect**, **Color**, **Select**, and **Frame**, then use **Before / after** to compare. On a phone, expand the controls for detailed editing or hide them to work directly on the canvas.
+2. Choose a classic starter in **Looks**, or explore **Artistic** for expressive materials and patterns. Tune **Effect**, **Color**, **Select**, and **Frame**, then use **Before / after** to compare. On a phone, expand the controls for detailed editing or hide them to work directly on the canvas.
 3. Scrub the timeline. Open **Trim** to drag the range handles, enter **In** and **Out** in seconds, or set either boundary at the playhead. Choose a frame-step rate for fine seeking. The highlighted range shows the export selection; **Full clip** resets it. Arrow keys seek 0.1 seconds (Shift: 1 second), and **I / O** set the trim.
 4. Choose **Export**, select the format and resolution, and create the file. A completed export stays available behind a Download button, including on iPad. It is labeled as a previous export when relevant edits change. Video export preferences are remembered.
 
@@ -14,8 +14,9 @@ The app never uploads your media. Settings and named presets are stored locally,
 ## What is included
 
 - Six distinct color-aware dithering methods: Bayer, Floyd–Steinberg, Atkinson, Jarvis–Judice–Ninke, Burkes, and Sierra.
-- Fifteen focused effects: Interlace, Screenprint, Contour type, Contour beads, Dot mosaic, Symbol field, Dither, ASCII, Palette, Threshold, Halftone, Crosshatch, Edges, Channel study, and Pixelate. Dither + ASCII is an ASCII mode, with legacy presets preserved. Graphic, Digital, and Utilities families keep the picker compact.
-- Eighteen style starters, including Signal weave, Color loom, Night ribbons, CMYK Overprint, Contour poetry, and Carbon echoes. Preview the current source frame across the entire style library on demand.
+- Nineteen focused effects: Guilloché, Cut paper, Facet glass, Arc tiles, Interlace, Screenprint, Contour type, Contour beads, Dot mosaic, Symbol field, Dither, ASCII, Palette, Threshold, Halftone, Crosshatch, Edges, Channel study, and Pixelate. Dither + ASCII is an ASCII mode, with legacy presets preserved. Artistic, Graphic, Digital, and Utilities families keep the picker compact.
+- Twenty-six style starters, including Signal weave, Color loom, Night ribbons, CMYK Overprint, Contour poetry, and Carbon echoes. The Artistic tab curates sixteen of these across nine techniques and remembers the selected technique while editing. Preview the visible collection on your current source frame on demand.
+- Four new artistic renderers: engraved wave fields, cut-paper leaves and petals, irregular triangular glass, and connected Truchet arc ribbons. Eight starters and three curated ink palettes, with adjustable detail, shape, ink weight, and fixed spatial seeds.
 - Interlace reconstructs images and video with interlocking bands and stepped ribbons. Source-color and tonal-ink mapping, three reference-inspired palettes, and stable pattern seeds support both recognizable treatments and abstract graphic compositions.
 - Brightness/color selection, original-source eyedropper, paint/erase/lasso corrections, imported mattes, selection overlay, and optional original backdrop. Selection is manual or tonal; there is no automatic subject detection.
 - CMYK/duotone screens, contour lettering, fixed-time color echoes, effect/source mixing, and normalized paper grain.
@@ -82,6 +83,7 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 - `src/studio/use-preview.js`, `render-service.js`, `render-worker.js`: adaptive preview, worker backpressure, and cancellable rendering.
 - `src/studio/selection.js`, `framing.js`: source-attached selections and shared framing.
 - `src/studio/print-effects.js`, `finishing.js`, `echo-sampler.js`: print/type treatments, compositing, and fixed media-time echo samples.
+- `src/studio/artistic.js`: shared raster/vector geometry for engraving, paper, glass, and arc tiles.
 - `src/studio/interlace.js`: deterministic loom layout and shared raster/vector ink geometry.
 - `src/studio/use-appearance.js`, `use-workspace.js`, `use-canvas-gestures.js`: appearance, adaptive layout, and view-only navigation.
 - `src/studio/CropEditor.jsx`, `crop-geometry.js`, `TimeField.jsx`: staged source framing and precise committed values.
@@ -111,3 +113,5 @@ See [Workspace v3](docs/WORKSPACE-V3.md) for the implementation, validation, and
 See [Design workspace](docs/DESIGN-WORKSPACE.md) for the responsive redesign, interaction decisions, and verification limits.
 
 See [Interlace](docs/INTERLACE.md) for the reference-inspired filter, controls, and validation.
+
+See [Artistic collection](docs/ARTISTIC-COLLECTION.md) for inspiration sources, renderer behavior, and validation. Reproduce the artwork review and timings with `node scripts/check-artistic.mjs /path/to/review`.

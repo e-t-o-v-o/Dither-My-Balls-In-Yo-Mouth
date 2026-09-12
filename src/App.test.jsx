@@ -46,7 +46,7 @@ test("effect changes can be undone and redone", () => {
 test("Interlace controls and per-effect settings remain available across effect changes", () => {
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "Change effect" }));
-  fireEvent.click(screen.getByRole("button", { name: "Graphic", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Artistic", exact: true }));
   fireEvent.click(screen.getByRole("button", { name: "Interlace", exact: true }));
   expect(screen.getByRole("slider", { name: "Module size", exact: true })).toHaveValue("32");
   fireEvent.change(screen.getByLabelText("Structure"), { target: { value: "steps" } });
@@ -75,6 +75,36 @@ test("preset save and restore work without blocking prompts", () => {
   expect(
     JSON.parse(localStorage.getItem("dither.presets.v2"))["My look"].effect,
   ).toBe("dither");
+});
+test("Artistic is a keyboard-accessible collection with focused previews, controls, and undo", () => {
+  render(<App />);
+  const looksTab = screen.getByRole("tab", { name: "Looks" });
+  fireEvent.click(looksTab);
+  expect(screen.queryByRole("button", { name: /Banknote/ })).not.toBeInTheDocument();
+  fireEvent.keyDown(looksTab, { key: "ArrowRight" });
+  const artisticTab = screen.getByRole("tab", { name: "Artistic" });
+  expect(artisticTab).toHaveFocus();
+  expect(artisticTab).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("button", { name: /Signal weave/ })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Technique"), { target: { value: "cut-paper" } });
+  expect(screen.queryByRole("button", { name: /Signal weave/ })).not.toBeInTheDocument();
+  expect(screen.getByText("2 styles")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Paper garden/ }));
+  expect(screen.getByRole("button", { name: "Change effect" })).toHaveTextContent("Cut paper");
+  fireEvent.change(screen.getByLabelText("Paper shapes"), { target: { value: "petals" } });
+  expect(screen.queryByLabelText("Cut leaf veins")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(screen.getByLabelText("Paper shapes")).toHaveValue("leaves");
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Cathedral", exact: true }));
+  expect(screen.getByLabelText("Palette")).toHaveValue("Cathedral");
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  expect(screen.getByLabelText("Technique")).toHaveValue("cut-paper");
+  fireEvent.click(screen.getByRole("tab", { name: "Looks" }));
+  expect(screen.getByRole("button", { name: /Printed matter/ })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Color", exact: true }), { key: "End" });
+  expect(screen.getByRole("tab", { name: "Frame", exact: true })).toHaveFocus();
 });
 test("export offers current-frame formats and explicit dimensions", () => {
   render(<App />);
@@ -203,12 +233,12 @@ test("a selected mask survives trying styles only when Keep mask is enabled", ()
   render(<App />);
   fireEvent.click(screen.getByRole("tab", { name: "Looks" }));
   fireEvent.click(screen.getByRole("button", { name: /Mint cutout/ }));
-  fireEvent.click(screen.getByRole("tab", { name: "Looks" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
   fireEvent.click(screen.getByLabelText("Keep selection when changing looks"));
   fireEvent.click(screen.getByRole("button", { name: /Wayfinding/ }));
   fireEvent.click(screen.getByRole("tab", { name: /^Select/ }));
   expect(screen.getByLabelText("Select by")).toHaveValue("luminance");
-  fireEvent.click(screen.getByRole("tab", { name: "Looks" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
   fireEvent.click(screen.getByLabelText("Keep selection when changing looks"));
   fireEvent.click(screen.getByRole("button", { name: /Wayfinding/ }));
   fireEvent.click(screen.getByRole("tab", { name: /^Select/ }));

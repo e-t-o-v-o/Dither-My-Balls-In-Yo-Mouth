@@ -10,6 +10,7 @@ import {
   fonts,
   asciiVariants,
   usesPalette,
+  proceduralArtEffects,
 } from "./model";
 export const AdjustmentContext = createContext({ begin() {}, end() {} });
 export function Icon({ name, ...props }) {
@@ -402,7 +403,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
       {choosing && <Dialog title="Choose an effect" onClose={() => setChoosing(false)}>
         <div className="modal-body effect-library">
           <div className="segmented effect-families" role="group" aria-label="Effect families">
-            {["Graphic", "Digital", "Utilities"].map(name => <button key={name} aria-pressed={activeFamily === name} onClick={() => setFamily(name)}>{name}</button>)}
+            {["Artistic", "Graphic", "Digital", "Utilities"].map(name => <button key={name} aria-pressed={activeFamily === name} onClick={() => setFamily(name)}>{name}</button>)}
           </div>
           <div className="effect-grid">
             {effects.filter(([id]) => id !== "dither-ascii" && effectFamily(id) === activeFamily).map(([id, name, n, description]) => {
@@ -418,10 +419,10 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
       </Dialog>}
       <section className="inspector-section effect-adjustments">
         <Range
-          label={c.effect === "interlace" ? "Module size" : "Cell size"}
+          label={c.effect === "interlace" ? "Module size" : c.effect === "guilloche" ? "Line spacing" : proceduralArtEffects.includes(c.effect) ? "Shape size" : "Cell size"}
           value={c.cellSize}
           min={
-            ["screenprint", "interlace"].includes(c.effect)
+            ["cut-paper", "glass", "arc-tiles"].includes(c.effect) ? 16 : ["screenprint", "interlace", "guilloche"].includes(c.effect)
               ? 8
               : ["beads", "contour-type"].includes(c.effect)
                 ? 6
@@ -434,6 +435,36 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           Smaller cells preserve more detail. The pattern scales with your
           export.
         </p>
+
+        {proceduralArtEffects.includes(c.effect) && <>
+          <Select label="Artistic color" value={c.artColorMode} onChange={v => set("artColorMode", v)}>
+            <option value="palette">Match source to palette</option>
+            <option value="tone">Tonal palette · expressive color</option>
+            <option value="source">Source colors</option>
+            <option value="ink">Single ink</option>
+          </Select>
+          {c.effect === "guilloche" && <>
+            <Range label="Wave depth" value={c.engraveWarp * 100} min={0} max={100} unit="%" onChange={v => set("engraveWarp", v / 100)} />
+            <Range label="Ink weight" value={c.engraveWeight * 100} min={10} max={100} unit="%" onChange={v => set("engraveWeight", v / 100)} />
+          </>}
+          {c.effect === "cut-paper" && <>
+            <Select label="Paper shapes" value={c.paperShape} onChange={v => set("paperShape", v)}>
+              <option value="leaves">Leaves · botanical cuts</option><option value="petals">Petals · soft lobes</option>
+            </Select>
+            <Range label="Paper coverage" value={c.paperFill * 100} min={35} max={100} unit="%" onChange={v => set("paperFill", v / 100)} />
+            {c.paperShape === "leaves" && <Check label="Cut leaf veins" value={c.paperVeins} onChange={v => set("paperVeins", v)} />}
+          </>}
+          {c.effect === "glass" && <>
+            <Range label="Shard irregularity" value={c.glassScatter * 100} min={0} max={100} unit="%" onChange={v => set("glassScatter", v / 100)} />
+            <Range label="Seam width" value={c.glassGap * 100} min={0} max={20} unit="%" onChange={v => set("glassGap", v / 100)} />
+          </>}
+          {c.effect === "arc-tiles" && <>
+            <Range label="Ribbon lanes" value={c.arcBands} min={1} max={4} onChange={v => set("arcBands", v)} />
+            <Range label="Ribbon weight" value={c.arcWeight * 100} min={10} max={100} unit="%" onChange={v => set("arcWeight", v / 100)} />
+          </>}
+          <Range label="Pattern seed" value={c.artSeed} min={0} max={99} onChange={v => set("artSeed", v)} />
+          <p className="hint">Change the seed to explore a new composition. The pattern stays anchored throughout your video. Choose inks and paper in Color.</p>
+        </>}
 
         {c.effect === "interlace" && (
           <>
@@ -886,7 +917,7 @@ export function ColorControls({
             ))}
           </Select>
           <div className="palette-grid">
-            {(c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : [
+            {(c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : proceduralArtEffects.includes(c.effect) ? ["Gouache", "Cathedral", "Candy lacquer", "Paper", "Signal pop", "Electric"] : [
               "Paper",
               "Phosphor",
               "Amber",
@@ -948,6 +979,7 @@ export function ColorControls({
         />
         <div className="color-pair">
           {!usesPalette(c) &&
+            !(proceduralArtEffects.includes(c.effect) && c.artColorMode !== "ink") &&
             !["pixel", "channel"].includes(c.effect) &&
             !(c.effect === "screenprint" && c.screenMode === "cmyk") &&
             !(c.effect === "ascii" && c.textColor !== "foreground") &&

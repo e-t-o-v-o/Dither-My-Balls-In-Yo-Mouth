@@ -141,6 +141,7 @@ try {
   const results = [];
   const cases = [["mp4", "Overprint"], ["webm", "Carbon echoes"]];
   if (process.argv.includes("--interlace")) cases.push(["mp4", "Signal weave"], ["webm", "Night ribbons"]);
+  if (process.argv.includes("--artistic")) cases.push(["mp4", "Banknote"], ["webm", "Candy circuits"], ["mp4", "Paper garden"], ["webm", "Cathedral light"]);
   for (const [format, lookName] of cases) {
     const config = {
       ...looks.find(

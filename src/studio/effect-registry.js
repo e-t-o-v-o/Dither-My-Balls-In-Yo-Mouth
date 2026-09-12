@@ -1,3 +1,4 @@
+import { artisticEffects } from "./model";
 // Only these settings belong to an effect. Source, selection and finishing
 // stay in place while exploring other rendering methods.
 export const effectKeys = [
@@ -37,8 +38,14 @@ export const effectKeys = [
   "weaveCrossings",
   "weaveSeed",
   "weaveColorMode",
+  "artSeed", "artColorMode", "engraveWarp", "engraveWeight", "paperShape",
+  "paperFill", "paperVeins", "glassScatter", "glassGap", "arcBands", "arcWeight",
 ];
 export const effectDefaults = {
+  guilloche: { cellSize: 16, artColorMode: "ink" },
+  "cut-paper": { cellSize: 40 },
+  glass: { cellSize: 44 },
+  "arc-tiles": { cellSize: 40 },
   interlace: { cellSize: 32 },
   ascii: { cellSize: 14 },
   "dither-ascii": { cellSize: 14 },
@@ -50,18 +57,13 @@ export const effectDefaults = {
   "contour-type": { cellSize: 14 },
 };
 export const effectFamily = (id) =>
-  id === "channel"
+  artisticEffects.includes(id) ? "Artistic" : id === "channel"
     ? "Utilities"
     : [
-          "beads",
-          "interlace",
           "mosaic",
-          "symbols",
           "halftone",
           "crosshatch",
           "edge",
-          "screenprint",
-          "contour-type",
         ].includes(id)
       ? "Graphic"
       : "Digital";

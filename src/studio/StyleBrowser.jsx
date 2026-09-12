@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { looks } from "./model";
+import { looks, artisticEffects, effects } from "./model";
 import { drawSignal } from "./renderer";
 import { RenderService } from "./render-service";
 import { EchoSampler } from "./echo-sampler";
@@ -16,17 +16,24 @@ export function StyleBrowser({
   busy,
   onApply,
   onPause,
+  collection = "studio",
+  technique = "all",
+  onTechniqueChange,
 }) {
   const [previews, setPreviews] = useState({}),
     [rendering, setRendering] = useState(false),
     [error, setError] = useState("");
+  const artistic = collection === "artistic";
+  const collectionLooks = looks.filter(look => artisticEffects.includes(look.config.effect) === artistic);
+  const visibleLooks = collectionLooks.filter(look => technique === "all" || look.config.effect === technique);
   const controller = useRef();
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
     controller.current?.abort();
     setPreviews({});
     setRendering(false);
-  }, [config, source, keepMask]);
+    setError("");
+  }, [config, source, keepMask, collection, technique]);
   const close = () => {
     controller.current?.abort();
   };
@@ -53,7 +60,7 @@ export function StyleBrowser({
         .getContext("2d")
         .drawImage(frame, 0, 0, snapshot.width, snapshot.height);
       const output = document.createElement("canvas");
-      for (const look of looks) {
+      for (const look of visibleLooks) {
         if (abort.signal.aborted) break;
         const c = {
           ...applyStyle(look.config, config, keepMask),
@@ -84,7 +91,7 @@ export function StyleBrowser({
       if (controller.current === abort) setRendering(false);
     }
   };
-  const card = (look, expanded = false) => (
+  const card = (look) => (
     <button
       key={look.name}
       className="look"
@@ -96,9 +103,7 @@ export function StyleBrowser({
     >
       <img
         className="style-preview"
-        src={
-          expanded ? previews[look.name] || thumbnail(look) : thumbnail(look)
-        }
+        src={previews[look.name] || thumbnail(look)}
         alt=""
         loading="lazy"
         width="240"
@@ -110,14 +115,20 @@ export function StyleBrowser({
   );
   return (
     <section className="looks-section">
-      <div className="section-heading"><h2>Studio looks</h2><span>{looks.length} styles</span></div>
-      <p className="hint">A starting point for your next piece.</p>
+      <div className="section-heading"><h2>{artistic ? "Artistic collection" : "Studio looks"}</h2><span>{visibleLooks.length} styles</span></div>
+      <p className="hint">{artistic ? "Cut paper, engraved lines, colored glass. Choose a material and make it yours." : "Classic digital treatments and saved starting points."}</p>
+      {artistic && <label className="control">Technique
+        <select value={technique} onChange={e => onTechniqueChange(e.target.value)} disabled={busy}>
+          <option value="all">All techniques</option>
+          {effects.filter(([id]) => artisticEffects.includes(id)).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
+      </label>}
       {config.maskMode !== "none" && <label className="check style-options"><input type="checkbox" checked={keepMask} onChange={e => setKeepMask(e.target.checked)} disabled={busy} /><span>Keep selection when changing looks</span></label>}
       <button className="full style-preview-button" onClick={preview} disabled={rendering || busy}>
-        {rendering ? `Previewing ${Object.keys(previews).length} / ${looks.length}…` : "Preview looks on this frame"}
+        {rendering ? `Previewing ${Object.keys(previews).length} / ${visibleLooks.length}…` : "Preview looks on this frame"}
       </button>
       {error && <p className="inline-error">{error}</p>}
-      <div className="style-library-grid">{looks.map(look => card(look, true))}</div>
+      <div className="style-library-grid">{visibleLooks.map(card)}</div>
     </section>
   );
 }

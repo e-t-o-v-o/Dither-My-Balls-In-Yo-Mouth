@@ -65,6 +65,7 @@ import {
   AdjustmentContext,
 } from "./studio/Controls";
 import { historyReducer } from "./studio/editor-state";
+const workspaceTabs = [["presets", "Looks", "looks"], ["artistic", "Artistic", "spark"], ["effects", "Effect", "effect"], ["color", "Color", "color"], ["mask", "Select", "select"], ["frame", "Frame", "frame"]];
 function initialHistory() {
   const saved = readStorage("dither.config.v2", null);
   let c = saved
@@ -132,6 +133,8 @@ function App() {
     trimRef = useRef(trim);
   const { tray, setTray, panelWidth, resizePanel, compact } = useWorkspace();
   const [lookSection, setLookSection] = useState("studio");
+  const [artTechnique, setArtTechnique] = useState("all");
+  const inspectorScroll = useRef();
   const [tab, setTab] = useState("effects"),
     [keepMask, setKeepMask] = useState(false),
     [compare, setCompare] = useState(false),
@@ -145,6 +148,7 @@ function App() {
     [savedSession, setSavedSession] = useState(null),
     [autosaveStatus, setAutosaveStatus] = useState(""),
     projectInput = useRef();
+  useEffect(() => { if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0; }, [tab]);
   const [notice, setNotice] = useState(null),
     [loading, setLoading] = useState(false),
     [dialog, setDialog] = useState(null),
@@ -960,6 +964,37 @@ function App() {
     if (next !== "mask") setSelectionTool("none");
     if (tray === "canvas") setTray("edit");
   };
+  const styleBrowser = (
+    <StyleBrowser
+      key={tab === "artistic" ? "artistic" : "studio"}
+      collection={tab === "artistic" ? "artistic" : "studio"}
+      technique={tab === "artistic" ? artTechnique : "all"}
+      onTechniqueChange={setArtTechnique}
+      config={config}
+      source={source}
+      time={timeRef.current}
+      keepMask={keepMask}
+      setKeepMask={setKeepMask}
+      busy={busy}
+      onApply={(look) => {
+        dispatch({
+          config: {
+            ...applyStyle(look.config, config, keepMask),
+            cropX: config.cropX,
+            cropY: config.cropY,
+            cropWidth: config.cropWidth,
+            cropHeight: config.cropHeight,
+          },
+        });
+        setSelectedPreset("");
+        selectTab("effects");
+      }}
+      onPause={() => {
+        setPlaying(false);
+        source.element?.pause?.();
+      }}
+    />
+  );
   return (
     <AdjustmentContext.Provider value={adjustmentHandlers}>
     <div
@@ -1139,21 +1174,21 @@ function App() {
         <aside className="inspector" aria-label="Editing controls">
           <div className="panel-resize" role="separator" aria-label="Inspector width" aria-orientation="vertical" aria-valuemin={300} aria-valuemax={420} aria-valuenow={panelWidth} tabIndex={compact || tray === "canvas" ? -1 : 0} {...resizePanel} />
           <div className="tray-heading">
-            <span>{tab === "effects" ? "Effect" : tab === "presets" ? "Looks" : tab === "mask" ? "Selection" : tab === "frame" ? "Frame" : "Color & finish"}</span>
+            <span>{tab === "effects" ? "Effect" : tab === "presets" ? "Looks" : tab === "artistic" ? "Artistic" : tab === "mask" ? "Selection" : tab === "frame" ? "Frame" : "Color & finish"}</span>
             <div>
               <button className="small tray-expand" aria-label={tray === "detail" ? "Compact controls" : "Expand controls"} onClick={() => setTray(tray === "detail" ? "edit" : "detail")}><Icon name={tray === "detail" ? "collapse" : "expand"} /><span>{tray === "detail" ? "Less" : "More"}</span></button>
               <button className="icon-button" aria-label="Show canvas" onClick={() => setTray("canvas")}><Icon name="close" /></button>
             </div>
           </div>
           <div className="inspector-tabs" role="tablist" aria-label="Editing tools">
-            {[["presets", "Looks", "looks"], ["effects", "Effect", "effect"], ["color", "Color", "color"], ["mask", "Select", "select"], ["frame", "Frame", "frame"]].map(([id, label, icon]) => (
+            {workspaceTabs.map(([id, label, icon]) => (
               <button key={id} id={`tab-${id}`} role="tab" aria-label={id === "mask" && config.maskMode !== "none" ? "Select, active" : label}
                 aria-selected={tab === id} aria-controls={`panel-${id}`} tabIndex={tab === id ? 0 : -1}
                 onKeyDown={e => {
-                  const tabs = ["presets", "effects", "color", "mask", "frame"];
+                  const tabs = workspaceTabs.map(([id]) => id);
                   if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
                     e.preventDefault();
-                    const next = e.key === "Home" ? tabs[0] : e.key === "End" ? tabs[4] : tabs[(tabs.indexOf(tab) + (e.key === "ArrowRight" ? 1 : 4)) % 5];
+                    const next = e.key === "Home" ? tabs[0] : e.key === "End" ? tabs.at(-1) : tabs[(tabs.indexOf(tab) + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
                     selectTab(next); document.getElementById(`tab-${next}`).focus();
                   }
                 }} onClick={() => selectTab(id)}><Icon name={icon} /><span>{label}</span>{id === "mask" && config.maskMode !== "none" && <span className="mask-indicator" aria-hidden="true" />}</button>
@@ -1161,6 +1196,7 @@ function App() {
           </div>
           <div
             className="inspector-scroll"
+            ref={inspectorScroll}
             id={`panel-${tab}`}
             role="tabpanel"
             aria-labelledby={`tab-${tab}`}
@@ -1216,39 +1252,14 @@ function App() {
                   onMatteUpload={importMatte}
                 />
               )}
+              {tab === "artistic" && styleBrowser}
               {tab === "presets" && (
                 <>
                   <div className="segmented look-sections" role="group" aria-label="Look library">
                     <button aria-pressed={lookSection === "studio"} onClick={() => setLookSection("studio")}>Studio</button>
                     <button aria-pressed={lookSection === "saved"} onClick={() => setLookSection("saved")}>Saved <span className="count">{Object.keys(presets).length}</span></button>
                   </div>
-                  {lookSection === "studio" ? (
-          <StyleBrowser
-            config={config}
-            source={source}
-            time={timeRef.current}
-            keepMask={keepMask}
-            setKeepMask={setKeepMask}
-            busy={busy}
-            onApply={(look) => {
-              dispatch({
-                config: {
-                  ...applyStyle(look.config, config, keepMask),
-                  cropX: config.cropX,
-                  cropY: config.cropY,
-                  cropWidth: config.cropWidth,
-                  cropHeight: config.cropHeight,
-                },
-              });
-              setSelectedPreset("");
-              selectTab("effects");
-            }}
-            onPause={() => {
-              setPlaying(false);
-              source.element?.pause?.();
-            }}
-          />
-                  ) : <>
+                  {lookSection === "studio" ? styleBrowser : <>
                   <section className="inspector-section">
                     <div className="section-heading">
                       <h2>Saved looks</h2>
