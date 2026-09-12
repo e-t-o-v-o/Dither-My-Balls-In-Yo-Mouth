@@ -79,13 +79,28 @@ export function usePreview(options) {
       if (
         o.playing &&
         o.source.kind !== "camera" &&
-        t >= o.trimRef.current[1]
+        (t >= o.trimRef.current[1] ||
+          (o.source.kind === "video" && o.source.element.ended))
       ) {
         if (o.loop) {
           t = o.trimRef.current[0];
           startTime = t;
           clock = now;
-          if (o.source.kind === "video") o.source.element.currentTime = t;
+          if (o.source.kind === "video") {
+            const video = o.source.element;
+            video.currentTime = t;
+            // Rewinding clears ended, but native playback remains paused after
+            // a full clip finishes. Resume it as well as resetting the clock.
+            if (video.paused) {
+              video.play()?.catch((error) => {
+                if (active && latest.current.source === o.source) {
+                  o.setPlaying(false);
+                  if (error.name !== "AbortError")
+                    o.alert(`Video could not resume: ${error.message}`, true);
+                }
+              });
+            }
+          }
           service.invalidate();
           dirty.current = true;
         } else {
@@ -113,7 +128,7 @@ export function usePreview(options) {
       if (
         o.source.element &&
         ["video", "camera"].includes(o.source.kind) &&
-        o.source.element.readyState < 2
+        (o.source.element.readyState < 2 || o.source.element.seeking)
       )
         return;
       const target =
