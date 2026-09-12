@@ -1,6 +1,9 @@
 import { charPalettes, paletteSets, asciiVariants, fonts } from "../constants";
 export { asciiVariants, fonts };
 export const palettes = {
+  "Gouache": ["#152b69", "#2257b8", "#25896b", "#d94d35", "#ee9689", "#efb63d", "#f4e6cb"],
+  "Cathedral": ["#162335", "#4c345d", "#146974", "#3e8a9c", "#ba5846", "#d5a353", "#d2ddd0"],
+  "Candy lacquer": ["#35234d", "#7550a6", "#e45b84", "#f2935c", "#6bbcae", "#f3ce61", "#f6ead7"],
   "Loom primary": ["#191919", "#0070f6", "#ff0000", "#00af57", "#ff69a2", "#fbbb00"],
   "Loom textile": ["#2d2d2d", "#99270d", "#2677d9", "#1ea963", "#e83014", "#ff6e26", "#aecce5", "#cecece", "#ffcf43", "#efe3da"],
   "Loom nocturne": ["#060606", "#8c301b", "#d53d25", "#498e75", "#3175d5", "#e979ab", "#cececc"],
@@ -21,7 +24,13 @@ export const palettes = {
   ...charPalettes,
   ...paletteSets,
 };
+export const proceduralArtEffects = ["guilloche", "cut-paper", "glass", "arc-tiles"];
+export const artisticEffects = [...proceduralArtEffects, "interlace", "screenprint", "contour-type", "beads", "symbols"];
 export const effects = [
+  ["guilloche", "Guilloché", "17", "Engraved wave fields reveal your image through the width of each flowing line."],
+  ["cut-paper", "Cut paper", "18", "Organic leaves and petals cut from color, with open space and delicate veins."],
+  ["glass", "Facet glass", "19", "An irregular mesh of colored shards with fine, adjustable seams."],
+  ["arc-tiles", "Arc tiles", "20", "Connected quarter-circle ribbons form wandering paths, loops, and nested rings."],
   [
     "interlace",
     "Interlace",
@@ -185,8 +194,27 @@ export const defaults = {
   weaveCrossings: 0.7,
   weaveSeed: 7,
   weaveColorMode: "source",
+  artSeed: 17,
+  artColorMode: "palette",
+  engraveWarp: 0.7,
+  engraveWeight: 0.85,
+  paperShape: "leaves",
+  paperFill: 0.95,
+  paperVeins: true,
+  glassScatter: 0.8,
+  glassGap: 0.06,
+  arcBands: 2,
+  arcWeight: 0.9,
 };
 const numeric = {
+  artSeed: [0, 99],
+  engraveWarp: [0, 1],
+  engraveWeight: [0.1, 1],
+  paperFill: [0.35, 1],
+  glassScatter: [0, 1],
+  glassGap: [0, 0.2],
+  arcBands: [1, 4],
+  arcWeight: [0.1, 1],
   weaveDetail: [0, 1],
   weaveWidth: [0.2, 0.8],
   weaveCrossings: [0, 1],
@@ -292,6 +320,8 @@ export function sanitizeConfig(input = {}) {
     c.cellSize = Math.max(6, c.cellSize);
   if (c.effect === "screenprint") c.cellSize = Math.max(8, c.cellSize);
   if (c.effect === "interlace") c.cellSize = Math.max(8, c.cellSize);
+  if (c.effect === "guilloche") c.cellSize = Math.max(8, c.cellSize);
+  if (["cut-paper", "glass", "arc-tiles"].includes(c.effect)) c.cellSize = Math.max(16, c.cellSize);
   if (!methods.some(([id]) => id === c.method)) c.method = defaults.method;
   if (!Object.hasOwn(palettes, c.palette)) c.palette = defaults.palette;
   for (const k of [
@@ -318,6 +348,8 @@ export function sanitizeConfig(input = {}) {
     screenMode: ["cmyk", "duotone"],
     weavePattern: ["weave", "bands", "steps"],
     weaveColorMode: ["source", "tone"],
+    artColorMode: ["source", "palette", "tone", "ink"],
+    paperShape: ["leaves", "petals"],
     underlayMode: ["source", "palette"],
   }))
     if (!values.includes(c[key])) c[key] = defaults[key];
@@ -327,6 +359,8 @@ export function sanitizeConfig(input = {}) {
   c.echoCount = Math.round(c.echoCount);
   c.contourLevels = Math.round(c.contourLevels);
   c.weaveSeed = Math.round(c.weaveSeed);
+  c.artSeed = Math.round(c.artSeed);
+  c.arcBands = Math.round(c.arcBands);
   if (!Object.hasOwn(palettes, c.echoPalette))
     c.echoPalette = defaults.echoPalette;
   return c;
@@ -334,6 +368,7 @@ export function sanitizeConfig(input = {}) {
 export function usesPalette(c) {
   return (
     ["dither", "dither-ascii", "palette", "interlace"].includes(c.effect) ||
+    (proceduralArtEffects.includes(c.effect) && ["palette", "tone"].includes(c.artColorMode)) ||
     (c.effect === "ascii" &&
       (c.textColor === "palette" ||
         (c.underlay && c.underlayMode === "palette"))) ||
@@ -394,6 +429,46 @@ export function parsePresets(value) {
   return result;
 }
 export const looks = [
+  {
+    name: "Banknote",
+    note: "Guilloché / fine flowing ink",
+    config: { ...defaults, effect: "guilloche", cellSize: 16, artColorMode: "ink", fgColor: "#194e45", bgColor: "#f3edda", engraveWarp: 0.85 },
+  },
+  {
+    name: "Chromatic current",
+    note: "Guilloché / waves of color",
+    config: { ...defaults, effect: "guilloche", cellSize: 20, artColorMode: "tone", palette: "Candy lacquer", fgColor: "#f6ead7", bgColor: "#251d32", engraveWarp: 1, engraveWeight: 0.95, artSeed: 41 },
+  },
+  {
+    name: "Paper garden",
+    note: "Cut paper / gouache leaves",
+    config: { ...defaults, effect: "cut-paper", cellSize: 64, palette: "Gouache", fgColor: "#152b69", bgColor: "#f4e6cb", artColorMode: "tone" },
+  },
+  {
+    name: "Petal study",
+    note: "Cut paper / scattered blossoms",
+    config: { ...defaults, effect: "cut-paper", cellSize: 56, palette: "Candy lacquer", fgColor: "#f6ead7", bgColor: "#35234d", paperShape: "petals", paperFill: 0.92, artColorMode: "tone", artSeed: 29 },
+  },
+  {
+    name: "Cathedral light",
+    note: "Facet glass / luminous shards",
+    config: { ...defaults, effect: "glass", cellSize: 64, palette: "Cathedral", bgColor: "#162335", glassScatter: 1, glassGap: 0.065, artColorMode: "tone" },
+  },
+  {
+    name: "Prism fragments",
+    note: "Facet glass / fractured color",
+    config: { ...defaults, effect: "glass", cellSize: 40, palette: "Gouache", bgColor: "#f4e6cb", glassScatter: 0.85, glassGap: 0.11, artColorMode: "source", artSeed: 37 },
+  },
+  {
+    name: "Serpentine",
+    note: "Arc tiles / wandering ribbons",
+    config: { ...defaults, effect: "arc-tiles", cellSize: 56, palette: "Gouache", fgColor: "#152b69", bgColor: "#f4e6cb", arcBands: 1, artColorMode: "tone" },
+  },
+  {
+    name: "Candy circuits",
+    note: "Arc tiles / nested color loops",
+    config: { ...defaults, effect: "arc-tiles", cellSize: 64, palette: "Candy lacquer", fgColor: "#f6ead7", bgColor: "#35234d", arcBands: 3, artColorMode: "tone", artSeed: 52 },
+  },
   {
     name: "Signal weave",
     note: "Interlace / vivid ink bands",

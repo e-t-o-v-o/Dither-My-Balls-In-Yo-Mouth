@@ -168,7 +168,7 @@ test("symbol accents are repeatable and do not leave pixels from the previous fr
 });
 
 test.each(
-  ["two-tone", "edge", "halftone", "mosaic", "symbols", "interlace"].flatMap((effect) =>
+  ["two-tone", "edge", "halftone", "mosaic", "symbols", "interlace", "guilloche", "cut-paper", "glass", "arc-tiles"].flatMap((effect) =>
     [true, false].map((backdrop) => [effect, backdrop]),
   ),
 )(
