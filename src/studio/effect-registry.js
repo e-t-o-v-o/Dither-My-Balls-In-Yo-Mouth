@@ -40,8 +40,13 @@ export const effectKeys = [
   "weaveColorMode",
   "artSeed", "artColorMode", "engraveWarp", "engraveWeight", "paperShape",
   "paperFill", "paperVeins", "glassScatter", "glassGap", "arcBands", "arcWeight",
+  "marbleSwirl", "marbleWeight", "topoLevels", "topoSoftness", "topoStyle", "topoContour",
+  "stitchLength", "stitchWidth", "stitchFollow", "stitchStrands",
 ];
 export const effectDefaults = {
+  marbling: { cellSize: 24, artColorMode: "ink" },
+  topography: { cellSize: 20, artColorMode: "tone" },
+  threadwork: { cellSize: 32, artColorMode: "source" },
   guilloche: { cellSize: 16, artColorMode: "ink" },
   "cut-paper": { cellSize: 40 },
   glass: { cellSize: 44 },

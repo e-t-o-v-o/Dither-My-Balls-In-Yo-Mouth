@@ -1,4 +1,5 @@
 import { rgb, luma, nearest } from "./pixels";
+import { MaterialRenderer } from "./material-art";
 
 const TAU = Math.PI * 2;
 const clamp = (x, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, x));
@@ -43,6 +44,7 @@ export class ArtisticRenderer {
     this.colors = new Map();
     this.meshKey = "";
     this.mesh = [];
+    this.material = new MaterialRenderer();
   }
   render(ctx, data, w, h, c, width, height, palette) {
     const key = `${c.palette}/${c.artColorMode}/${c.fgColor}`;
@@ -71,7 +73,7 @@ export class ArtisticRenderer {
       if (c.artColorMode === "ink") return c.fgColor;
       // Keep all eight bits in source-color output. Only palette matching uses
       // the bounded lookup table; source footage must not acquire banding.
-      if (c.artColorMode === "source") return `rgb(${Math.round(p[0])},${Math.round(p[1])},${Math.round(p[2])})`;
+      if (c.artColorMode === "source") return `#${((1 << 24) | (Math.round(p[0]) << 16) | (Math.round(p[1]) << 8) | Math.round(p[2])).toString(16).slice(1)}`;
       const k = ((p[0] >> 3) << 10) | ((p[1] >> 3) << 5) | (p[2] >> 3);
       if (!this.colors.has(k)) {
         const q = [(p[0] & 248) + 4, (p[1] & 248) + 4, (p[2] & 248) + 4];
@@ -89,10 +91,11 @@ export class ArtisticRenderer {
     if (c.effect === "guilloche") this.engrave(marks, sample, color, tone, c, w, h);
     else if (c.effect === "cut-paper") this.paper(marks, sample, color, tone, c, w, h);
     else if (c.effect === "glass") this.glass(marks, sample, color, tone, c, Math.ceil(w / 2), Math.ceil(h / 2));
-    else this.arcs(marks, sample, color, tone, c, Math.ceil(w / 2), Math.ceil(h / 2));
+    else if (c.effect === "arc-tiles") this.arcs(marks, sample, color, tone, c, Math.ceil(w / 2), Math.ceil(h / 2));
+    else this.material.render(marks, sample, color, tone, c, w, h, hash);
     // Long wave ribbons are disjoint. Filling each independently avoids an
     // expensive compound-path intersection pass in canvas implementations.
-    marks.draw(ctx, width, height, c.effect === "cut-paper" ? "evenodd" : "nonzero", c.effect === "guilloche");
+    marks.draw(ctx, width, height, c.effect === "cut-paper" ? "evenodd" : "nonzero", ["guilloche", "threadwork"].includes(c.effect));
   }
 
   engrave(marks, sample, color, tone, c, w, h) {

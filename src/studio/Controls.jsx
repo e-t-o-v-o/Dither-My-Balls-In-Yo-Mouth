@@ -11,6 +11,7 @@ import {
   asciiVariants,
   usesPalette,
   proceduralArtEffects,
+  materialArtEffects,
 } from "./model";
 export const AdjustmentContext = createContext({ begin() {}, end() {} });
 export function Icon({ name, ...props }) {
@@ -419,10 +420,10 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
       </Dialog>}
       <section className="inspector-section effect-adjustments">
         <Range
-          label={c.effect === "interlace" ? "Module size" : c.effect === "guilloche" ? "Line spacing" : proceduralArtEffects.includes(c.effect) ? "Shape size" : "Cell size"}
+          label={c.effect === "interlace" ? "Module size" : ["guilloche", "marbling"].includes(c.effect) ? "Line spacing" : c.effect === "topography" ? "Contour detail" : c.effect === "threadwork" ? "Stitch size" : proceduralArtEffects.includes(c.effect) ? "Shape size" : "Cell size"}
           value={c.cellSize}
           min={
-            ["cut-paper", "glass", "arc-tiles"].includes(c.effect) ? 16 : ["screenprint", "interlace", "guilloche"].includes(c.effect)
+            materialArtEffects.includes(c.effect) ? 12 : ["cut-paper", "glass", "arc-tiles"].includes(c.effect) ? 16 : ["screenprint", "interlace", "guilloche"].includes(c.effect)
               ? 8
               : ["beads", "contour-type"].includes(c.effect)
                 ? 6
@@ -462,8 +463,30 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
             <Range label="Ribbon lanes" value={c.arcBands} min={1} max={4} onChange={v => set("arcBands", v)} />
             <Range label="Ribbon weight" value={c.arcWeight * 100} min={10} max={100} unit="%" onChange={v => set("arcWeight", v / 100)} />
           </>}
-          <Range label="Pattern seed" value={c.artSeed} min={0} max={99} onChange={v => set("artSeed", v)} />
-          <p className="hint">Change the seed to explore a new composition. The pattern stays anchored throughout your video. Choose inks and paper in Color.</p>
+          {c.effect === "marbling" && <>
+            <Range label="Swirl depth" value={c.marbleSwirl * 100} min={0} max={100} unit="%" onChange={v => set("marbleSwirl", v / 100)} />
+            <Range label="Ink coverage" value={c.marbleWeight * 100} min={10} max={100} unit="%" onChange={v => set("marbleWeight", v / 100)} />
+          </>}
+          {c.effect === "topography" && <>
+            <Select label="Contour treatment" value={c.topoStyle} onChange={v => set("topoStyle", v)}>
+              <option value="terraces">Terraces · layered color</option><option value="isolines">Isolines · open contour bands</option>
+            </Select>
+            <Range label="Contour levels" value={c.topoLevels} min={3} max={16} onChange={v => set("topoLevels", v)} />
+            <Range label="Contour softness" value={c.topoSoftness} min={0} max={3} onChange={v => set("topoSoftness", v)} />
+            <Range label={c.topoStyle === "terraces" ? "Terrace separation" : "Contour coverage"} value={c.topoContour * 100} min={4} max={60} unit="%" onChange={v => set("topoContour", v / 100)} />
+            <p className="hint">Contours follow brightness in your image. More levels reveal finer changes; softness quiets small details.</p>
+          </>}
+          {c.effect === "threadwork" && <>
+            <Range label="Follow image edges" value={c.stitchFollow * 100} min={0} max={100} unit="%" onChange={v => set("stitchFollow", v / 100)} />
+            <Range label="Stitch length" value={c.stitchLength * 100} min={30} max={100} unit="%" onChange={v => set("stitchLength", v / 100)} />
+            <Range label="Thread weight" value={c.stitchWidth * 100} min={15} max={100} unit="%" onChange={v => set("stitchWidth", v / 100)} />
+            <Range label="Strands per stitch" value={c.stitchStrands} min={1} max={3} onChange={v => set("stitchStrands", v)} />
+          </>}
+          {c.effect !== "topography" && <>
+            <Range label="Pattern seed" value={c.artSeed} min={0} max={99} onChange={v => set("artSeed", v)} />
+            <button className="full" onClick={() => set("artSeed", (c.artSeed + 37) % 100)}><Icon name="spark" /> New variation</button>
+            <p className="hint">Explore another composition, then Undo to compare. The seed stays fixed throughout your video. Choose inks and paper in Color.</p>
+          </>}
         </>}
 
         {c.effect === "interlace" && (
@@ -917,7 +940,7 @@ export function ColorControls({
             ))}
           </Select>
           <div className="palette-grid">
-            {(c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : proceduralArtEffects.includes(c.effect) ? ["Gouache", "Cathedral", "Candy lacquer", "Paper", "Signal pop", "Electric"] : [
+            {(c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : materialArtEffects.includes(c.effect) ? ["Mineral", "Silk", "Gouache", "Cathedral", "Candy lacquer", "Paper"] : proceduralArtEffects.includes(c.effect) ? ["Gouache", "Cathedral", "Candy lacquer", "Paper", "Signal pop", "Electric"] : [
               "Paper",
               "Phosphor",
               "Amber",

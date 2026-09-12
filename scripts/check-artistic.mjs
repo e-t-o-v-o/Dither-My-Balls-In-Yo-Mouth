@@ -13,13 +13,14 @@ async function bundle(entry) {
   return import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 }
 const { FrameRenderer, drawSignal } = await bundle("src/studio/renderer.js");
-const { looks, proceduralArtEffects } = await bundle("src/studio/model.js");
-const outputDir = process.argv[2];
-const input = process.argv[3] ? await loadImage(process.argv[3]) : drawSignal(createCanvas(1280, 720), 1.3);
+const { looks, proceduralArtEffects, materialArtEffects } = await bundle("src/studio/model.js");
+const args = process.argv.slice(2).filter(arg => !arg.startsWith("--"));
+const styleLooks = looks.filter(look => (process.argv.includes("--materials") ? materialArtEffects : proceduralArtEffects).includes(look.config.effect));
+const outputDir = args[0];
+const input = args[1] ? await loadImage(args[1]) : drawSignal(createCanvas(1280, 720), 1.3);
 if (outputDir) {
   await mkdir(outputDir, { recursive: true });
-  const styleLooks = looks.filter(look => proceduralArtEffects.includes(look.config.effect));
-  const sheet = createCanvas(1600, 2520), ctx = sheet.getContext("2d");
+  const sheet = createCanvas(1600, Math.ceil((styleLooks.length + 1) / 2) * 500 + 20), ctx = sheet.getContext("2d");
   ctx.fillStyle = "#191919";
   ctx.fillRect(0, 0, sheet.width, sheet.height);
   const items = [{ name: "Source", config: null }, ...styleLooks];
@@ -55,7 +56,7 @@ const inputs = Array.from({ length: 8 }, (_, frame) => {
 });
 const timings = [];
 for (const size of [1280, 1920, 3840]) {
-  for (const look of looks.filter(look => proceduralArtEffects.includes(look.config.effect))) {
+  for (const look of styleLooks) {
     const config = look.config;
     const renderer = new FrameRenderer(), canvas = createCanvas(size, Math.round(size * 9 / 16));
     const frames = [];

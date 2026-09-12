@@ -14,9 +14,9 @@ The app never uploads your media. Settings and named presets are stored locally,
 ## What is included
 
 - Six distinct color-aware dithering methods: Bayer, Floyd–Steinberg, Atkinson, Jarvis–Judice–Ninke, Burkes, and Sierra.
-- Nineteen focused effects: Guilloché, Cut paper, Facet glass, Arc tiles, Interlace, Screenprint, Contour type, Contour beads, Dot mosaic, Symbol field, Dither, ASCII, Palette, Threshold, Halftone, Crosshatch, Edges, Channel study, and Pixelate. Dither + ASCII is an ASCII mode, with legacy presets preserved. Artistic, Graphic, Digital, and Utilities families keep the picker compact.
-- Twenty-six style starters, including Signal weave, Color loom, Night ribbons, CMYK Overprint, Contour poetry, and Carbon echoes. The Artistic tab curates sixteen of these across nine techniques and remembers the selected technique while editing. Preview the visible collection on your current source frame on demand.
-- Four new artistic renderers: engraved wave fields, cut-paper leaves and petals, irregular triangular glass, and connected Truchet arc ribbons. Eight starters and three curated ink palettes, with adjustable detail, shape, ink weight, and fixed spatial seeds.
+- Twenty-two focused effects, including Marbled ink, Contour atlas, Threadwork, Guilloché, Cut paper, Facet glass, Arc tiles, Interlace, and the classic print, type, dither, and color tools. Dither + ASCII is an ASCII mode, with legacy presets preserved. Artistic, Graphic, Digital, and Utilities families keep the picker compact.
+- Thirty-two style starters. The Artistic tab curates twenty-two across twelve techniques and remembers the selected technique while editing. Search by name, material, or description; preview visible results on the current frame and stop a batch at any time.
+- Seven procedural artistic renderers: swirling marbled ink, topographic color terraces, directional thread bundles, engraved wave fields, cut-paper leaves and petals, irregular triangular glass, and connected Truchet arc ribbons. Fourteen starters and five curated ink palettes. **New variation** explores another seeded composition with Undo for comparison.
 - Interlace reconstructs images and video with interlocking bands and stepped ribbons. Source-color and tonal-ink mapping, three reference-inspired palettes, and stable pattern seeds support both recognizable treatments and abstract graphic compositions.
 - Brightness/color selection, original-source eyedropper, paint/erase/lasso corrections, imported mattes, selection overlay, and optional original backdrop. Selection is manual or tonal; there is no automatic subject detection.
 - CMYK/duotone screens, contour lettering, fixed-time color echoes, effect/source mixing, and normalized paper grain.
@@ -84,6 +84,7 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 - `src/studio/selection.js`, `framing.js`: source-attached selections and shared framing.
 - `src/studio/print-effects.js`, `finishing.js`, `echo-sampler.js`: print/type treatments, compositing, and fixed media-time echo samples.
 - `src/studio/artistic.js`: shared raster/vector geometry for engraving, paper, glass, and arc tiles.
+- `src/studio/material-art.js`: cached marbling fields, brightness terraces, and edge-following threadwork.
 - `src/studio/interlace.js`: deterministic loom layout and shared raster/vector ink geometry.
 - `src/studio/use-appearance.js`, `use-workspace.js`, `use-canvas-gestures.js`: appearance, adaptive layout, and view-only navigation.
 - `src/studio/CropEditor.jsx`, `crop-geometry.js`, `TimeField.jsx`: staged source framing and precise committed values.
