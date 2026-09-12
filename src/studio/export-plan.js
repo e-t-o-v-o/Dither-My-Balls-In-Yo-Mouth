@@ -89,7 +89,9 @@ export async function planVideoExport({
   checkAbort(signal);
   if (!codec)
     throw new Error(
-      "This format cannot encode at the selected size and frame rate. Try Auto, a lower resolution, or Live recording.",
+      format === "mp4"
+        ? "MP4 encoding is unavailable with these settings in this browser. Try a lower resolution or Live recording. Auto may create a WebM file instead."
+        : "This format cannot encode at the selected size and frame rate. Try Auto, a lower resolution, or Live recording.",
     );
   const estimatedBytes = Math.ceil(
       ((duration * (bitrate + (needsAudio ? 192_000 : 0))) / 8) * 1.08,
