@@ -35,7 +35,7 @@ import { ProjectDownload } from "./studio/ProjectDownload";
 import { ExportProgress } from "./studio/ExportProgress";
 import { EffectStack } from "./studio/EffectStack";
 import { activeLayers, layerConfig } from "./studio/stack";
-import { ExportReview } from "./studio/ExportReview";
+import { ExportResult } from "./studio/ExportResult";
 import { MotionControls } from "./studio/MotionControls";
 import { ExportFormat } from "./studio/ExportFormat";
 import { CropEditor } from "./studio/CropEditor";
@@ -141,6 +141,8 @@ function App() {
   const { tray, setTray, panelWidth, resizePanel, compact } = useWorkspace();
   const [lookSection, setLookSection] = useState("studio");
   const [artTechnique, setArtTechnique] = useState("all");
+  const [stackView, setStackView] = useState({});
+  const [exportSettingsOpen, setExportSettingsOpen] = useState(true);
   const inspectorScroll = useRef();
   const [tab, setTab] = useState("effects"),
     [keepMask, setKeepMask] = useState(false),
@@ -951,6 +953,7 @@ function App() {
           ? `Frame at ${timeLabel(at)}`
           : `${timeLabel(trim[0])} – ${timeLabel(trim[1])}`,
       });
+      setExportSettingsOpen(false);
       setProgress(1);
     } catch (e) {
       if (e.name === "AbortError")
@@ -1015,21 +1018,16 @@ function App() {
       config={config}
       source={source}
       time={timeRef.current}
+      trim={trim}
       keepMask={keepMask}
       setKeepMask={setKeepMask}
       busy={busy}
       onApply={(look) => {
         dispatch({
-          config: {
-            ...applyStyle(look.config, config, keepMask),
-            stack: config.stack,
-            cropX: config.cropX,
-            cropY: config.cropY,
-            cropWidth: config.cropWidth,
-            cropHeight: config.cropHeight,
-          },
+          config: applyStyle(look.config, config, keepMask),
         });
         setSelectedPreset("");
+        setStackView(current => ({ ...current, editing: "main", section: "effect" }));
         selectTab("effects");
       }}
       onPause={() => {
@@ -1261,10 +1259,11 @@ function App() {
             hidden={tray === "canvas"}
           >
             <fieldset className="control-fieldset" disabled={busy || loading}>
-              {["effects", "color"].includes(tab) && config.motion.enabled && ["video", "demo"].includes(source.kind) && Object.keys(config.motion.tracks).length > 0 && <button className="motion-active" onClick={() => selectTab("motion")}><Icon name="play" />Animation active · Edit motion</button>}
+              {["effects", "color"].includes(tab) && config.motion.enabled && ["video", "demo"].includes(source.kind) && Object.keys(config.motion.tracks).length > 0 && <button className="motion-active" onClick={() => selectTab("motion")}><Icon name="play" />{config.stack.length > 1 ? "Main effect animation" : "Animation active"} · Edit motion</button>}
               {tab === "effects" && (
                 <EffectStack
                   source={source} trim={trim} time={time} seekTo={scrub}
+                  view={stackView} setView={setStackView}
                   config={config}
                   set={set}
                   customFonts={customFonts}
@@ -1592,54 +1591,65 @@ function App() {
           busy={busy}
         >
           <div className="modal-body">
-            <canvas ref={exportPreviewRef} className="export-preview" aria-label="Export composition preview" />
-            <div className="export-source">
-              <span className="eyebrow">
-                {source.kind === "image"
-                  ? "STILL IMAGE"
-                  : `${(trim[1] - trim[0]).toFixed(1)} SECOND SELECTION`}
-              </span>
-              <strong>{source.name}</strong>
-              <span>
-                {stackSummary}{!config.stack.length && ` / ${paletteEffect ? config.palette : colorSummary}`}
-              </span>
-            </div>
-            <fieldset className="control-fieldset" disabled={busy}>
-              <ExportFormat value={format} onChange={chooseFormat} kind={source.kind} formats={formats} />
-              <div className="export-grid">
-                <Select
-                  label="Resolution · longest edge"
-                  value={resolution}
-                  onChange={setResolution}
-                >
-                  {format === "gif" ? (
-                    <>
-                      <option value="480">480 px</option>
-                      <option value="720">720 px</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="native">Source · up to 4096 px</option>
-                      <option value="1280">1280 px · 720p landscape</option>
-                      <option value="1920">1920 px · 1080p landscape</option>
-                      <option value="3840">3840 px · 4K landscape</option>
-                    </>
-                  )}
-                </Select>
+            {busy && <ExportProgress progress={progress} phase={exportPhase} format={format} onCancel={() => abortRef.current?.abort()} />}
+            {notice && (
+              <p
+                className={notice.error ? "inline-error" : "hint"}
+                role={notice.error ? "alert" : "status"}
+              >
+                {notice.text}
+              </p>
+            )}
+            {result && !busy && <ExportResult key={result.url} result={result} current={resultCurrent} onNotice={alert} />}
+            <details className="export-settings" open={exportSettingsOpen} onToggle={event => setExportSettingsOpen(event.currentTarget.open)}>
+              <summary>{result ? "Adjust export settings" : "Export settings"}</summary>
+              <canvas ref={exportPreviewRef} className="export-preview" aria-label="Export composition preview" />
+              <div className="export-source">
+                <span className="eyebrow">
+                  {source.kind === "image"
+                    ? "STILL IMAGE"
+                    : `${(trim[1] - trim[0]).toFixed(1)} SECOND SELECTION`}
+                </span>
+                <strong>{source.name}</strong>
+                <span>
+                  {stackSummary}{!config.stack.length && ` / ${paletteEffect ? config.palette : colorSummary}`}
+                </span>
               </div>
-              {!["png", "svg", "gif"].includes(format) && usePrecise && <Select label="Encoding quality" value={quality} onChange={setQuality}><option value="high">High · balanced file size</option><option value="maximum">Maximum · crisp texture</option></Select>}
-              {!["png", "svg", "gif"].includes(format) && source.kind === "video" && <Check label="Include source audio" value={includeAudio} onChange={setIncludeAudio} />}
-              <details className="export-advanced">
-                <summary>Advanced settings</summary>
-                {!["png", "svg"].includes(format) && <Select label="Frame rate" value={fps} onChange={v => setFps(Number(v))}>
-                  {(format === "gif" ? [10, 12, 15] : usePrecise ? [24, 30, 60] : [24, 30]).map(n => <option key={n} value={n}>{n} fps</option>)}
-                </Select>}
-                {!["png", "svg", "gif"].includes(format) && source.kind !== "camera" && <Select label="Export mode" value={engine} onChange={v => { setEngine(v); if (v === "live" && fps > 30) setFps(30); }}>
-                  {hasPreciseExport() && <option value="precise">Frame by frame · best quality</option>}<option value="live">Live recording · compatibility</option>
-                </Select>}
-                <p className="hint">Source: {source.width} × {source.height}. Preview quality does not limit export resolution.</p>
-                {exportPlan?.codec && <p className="hint">{exportPlan.codec.toUpperCase()} · {exportPlan.disk ? "Uses temporary device storage to limit memory use." : "Available memory checked."}</p>}
-                {["png", "svg"].includes(format) && <p className="hint">Transparent backgrounds are preserved. SVG embeds raster content when a source underlay is enabled.</p>}
+              <fieldset className="control-fieldset" disabled={busy}>
+                <ExportFormat value={format} onChange={chooseFormat} kind={source.kind} formats={formats} />
+                <div className="export-grid">
+                  <Select
+                    label="Resolution · longest edge"
+                    value={resolution}
+                    onChange={setResolution}
+                  >
+                    {format === "gif" ? (
+                      <>
+                        <option value="480">480 px</option>
+                        <option value="720">720 px</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="native">Source · up to 4096 px</option>
+                        <option value="1280">1280 px · 720p landscape</option>
+                        <option value="1920">1920 px · 1080p landscape</option>
+                        <option value="3840">3840 px · 4K landscape</option>
+                      </>
+                    )}
+                  </Select>
+                </div>
+                {!["png", "svg", "gif"].includes(format) && usePrecise && <Select label="Encoding quality" value={quality} onChange={setQuality}><option value="high">High · balanced file size</option><option value="maximum">Maximum · crisp texture</option></Select>}
+                {!["png", "svg", "gif"].includes(format) && source.kind === "video" && <Check label="Include source audio" value={includeAudio} onChange={setIncludeAudio} />}
+                <details className="export-advanced">
+                  <summary>{["png", "svg"].includes(format) ? "Source details" : "Frame rate & compatibility"}</summary>
+                  {!["png", "svg"].includes(format) && <Select label="Frame rate" value={fps} onChange={v => setFps(Number(v))}>
+                    {(format === "gif" ? [10, 12, 15] : usePrecise ? [24, 30, 60] : [24, 30]).map(n => <option key={n} value={n}>{n} fps</option>)}
+                  </Select>}
+                  {!["png", "svg", "gif"].includes(format) && source.kind !== "camera" && <Select label="Export mode" value={engine} onChange={v => { setEngine(v); if (v === "live" && fps > 30) setFps(30); }}>
+                    {hasPreciseExport() && <option value="precise">Frame by frame · best quality</option>}<option value="live">Live recording · compatibility</option>
+                  </Select>}
+                  <p className="hint">Source: {source.width} × {source.height}. Preview quality does not limit export resolution.</p>
+                  {exportPlan?.codec && <p className="hint">{exportPlan.codec.toUpperCase()} · {exportPlan.disk ? "Uses temporary device storage to limit memory use." : "Available memory checked."}</p>}
               </details>
               <div className="export-spec">
                 <span className="mono">
@@ -1672,7 +1682,6 @@ function App() {
               )}
               {format === "svg" && activeLayers(config).length > 1 && <p className="hint">Stacked SVG keeps the final effect’s vector geometry. Earlier effects are rendered into its source; blends may embed raster layers.</p>}
               {unavailableFormat && <p className="inline-error" role="status">{format.toUpperCase()} is unavailable in this browser’s current export mode. Choose another file type or export mode.</p>}
-              {format === "auto" && <p className="hint">Auto chooses a supported MP4 or WebM file. Select MP4 above if you need an .mp4 download.</p>}
               {exportPlan && (
                 <p
                   className={
@@ -1706,81 +1715,7 @@ function App() {
                 Create {["png", "svg"].includes(format) ? "frame" : "export"}
               </button>
             </fieldset>
-            {busy && <ExportProgress progress={progress} phase={exportPhase} format={format} onCancel={() => abortRef.current?.abort()} />}
-            {notice && (
-              <p
-                className={notice.error ? "inline-error" : "hint"}
-                role={notice.error ? "alert" : "status"}
-              >
-                {notice.text}
-              </p>
-            )}
-            {result && !busy && (
-              <div className="export-result">
-                <span className="eyebrow">
-                  {resultCurrent ? "READY TO SAVE" : "PREVIOUS EXPORT"}
-                </span>
-                <strong>{result.name}</strong>
-                <span>
-                  {result.effectName} · {result.selection}
-                </span>
-                <span>
-                  {(result.blob.size / 1024 / 1024).toFixed(2)} MB
-                </span>
-                {!resultCurrent && (
-                  <p className="hint">
-                    Your edits or export settings have changed. Create a new
-                    export to apply them.
-                  </p>
-                )}
-                <ExportReview key={result.url} result={result} />
-                {result.engine === "precise" && (
-                  <p className="hint">
-                    Frame-by-frame export
-                  </p>
-                )}
-                {result.actualFps < result.targetFps * 0.85 && (
-                  <p className="inline-error">
-                    This device rendered about {Math.round(result.actualFps)}{" "}
-                    fps. For smoother motion, lower the export resolution or
-                    increase cell size.
-                  </p>
-                )}
-                <a
-                  className="button primary full"
-                  href={result.url}
-                  download={result.name}
-                >
-                  <Icon name="download" />
-                  Download {resultCurrent ? "" : "previous "}
-                  {result.extension.toUpperCase()}
-                </a>
-                {navigator.canShare && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const file = new File([result.blob], result.name, {
-                          type: result.blob.type,
-                        });
-                        if (!navigator.canShare({ files: [file] })) {
-                          alert("Use Download to save this file.");
-                          return;
-                        }
-                        await navigator.share({
-                          files: [file],
-                          title: result.name,
-                        });
-                      } catch (e) {
-                        if (e.name !== "AbortError")
-                          alert("Use Download to save this file.");
-                      }
-                    }}
-                  >
-                    Share / Save to Files
-                  </button>
-                )}
-              </div>
-            )}
+            </details>
           </div>
         </Dialog>
       )}

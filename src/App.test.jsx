@@ -285,6 +285,10 @@ test("a completed export remains downloadable and is labeled when later settings
     await screen.findByRole("link", { name: "Download PNG" }),
   ).toHaveAttribute("href", "blob:completed");
   expect(screen.getByText("READY TO SAVE")).toBeInTheDocument();
+  const settings = screen.getByText("Adjust export settings").closest("details");
+  expect(settings).not.toHaveAttribute("open");
+  fireEvent.click(screen.getByText("Adjust export settings"));
+  await waitFor(() => expect(settings).toHaveAttribute("open"));
   fireEvent.change(screen.getByLabelText("Resolution · longest edge"), {
     target: { value: "1280" },
   });
@@ -444,8 +448,18 @@ test("effect stacks add, reorder, bypass, edit independently, and undo without l
   expect(screen.getByText(/This effect is bypassed/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
   expect(screen.getByRole("checkbox", { name: "Enable Screenprint layer 2" })).toBeChecked();
+  fireEvent.click(within(screen.getByRole("group", { name: "Layer controls" })).getByRole("button", { name: "Color", exact: true }));
+  fireEvent.click(screen.getByRole("tab", { name: "Frame", exact: true }));
+  fireEvent.click(screen.getByRole("tab", { name: "Effect", exact: true }));
+  expect(screen.getByRole("button", { name: "Edit Screenprint layer 2" })).toHaveAttribute("aria-pressed", "true");
+  expect(within(screen.getByRole("group", { name: "Layer controls" })).getByRole("button", { name: "Color", exact: true })).toHaveAttribute("aria-pressed", "true");
   fireEvent.click(screen.getByRole("button", { name: "Edit Dither layer 1" }));
   expect(screen.getByRole("button", { name: "Change effect", exact: true })).toHaveTextContent("Dither");
   fireEvent.click(screen.getByRole("button", { name: "Remove Marbled ink layer 3" }));
   expect(screen.getByRole("combobox", { name: "Add effect", exact: true })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Edit Screenprint layer 2" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  fireEvent.click(screen.getByRole("button", { name: /Wayfinding/ }));
+  expect(screen.getByRole("button", { name: "Change effect", exact: true })).toHaveTextContent("Symbol field");
+  expect(screen.getByRole("button", { name: "Edit Screenprint layer 2" })).toHaveAttribute("aria-pressed", "false");
 });

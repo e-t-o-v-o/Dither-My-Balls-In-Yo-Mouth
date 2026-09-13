@@ -1,14 +1,15 @@
-import React, { useState } from "react";
+import React from "react";
 import { EffectControls, ColorControls, Range, Select, Icon } from "./Controls";
 import { MotionControls } from "./MotionControls";
 import { defaults, effects, sanitizeConfig } from "./model";
 import { effectDefaults, effectSnapshot } from "./effect-registry";
 import { stackEntries, layerConfig, moveLayer } from "./stack";
 
-export function EffectStack({ config, set, source, trim, time, seekTo, customFonts, onFontUpload }) {
-  const [editing, setEditing] = useState("main");
-  const [section, setSection] = useState("effect");
-  const [expanded, setExpanded] = useState(config.stack.length > 1);
+export function EffectStack({ config, set, source, trim, time, seekTo, customFonts, onFontUpload, view, setView }) {
+  const { editing = "main", section = "effect", expanded = config.stack.length > 1 } = view;
+  const setEditing = editing => setView(current => ({ ...current, editing }));
+  const setSection = section => setView(current => ({ ...current, section }));
+  const setExpanded = expanded => setView(current => ({ ...current, expanded }));
   const layers = stackEntries(config);
   const selected = layers.find(layer => layer.id === editing) || layers.find(layer => layer.id === "main");
   const main = selected.id === "main", c = layerConfig(config, selected);
