@@ -83,3 +83,13 @@ test("camera rendering uses a progressing clock while video uses media time", ()
   expect(renderClock("camera", 0, 1500)).toBe(1.5);
   expect(renderClock("video", 2, 1500)).toBe(2);
 });
+
+test("look application retains workspace framing and added layers without mutating either", () => {
+  const current = { ...defaults, cropX: 0.25, cropWidth: 0.5,
+    stack: [{ id: "main", enabled: false, mix: 1 }, { id: "extra", enabled: true, mix: 0.5, settings: { ...defaults, effect: "halftone" } }] };
+  const style = { ...defaults, effect: "pixel" };
+  const applied = applyStyle(style, current);
+  expect(applied).toMatchObject({ effect: "pixel", cropX: 0.25, cropWidth: 0.5, stack: current.stack });
+  expect(style.stack).toEqual([]);
+  expect(current.effect).toBe(defaults.effect);
+});

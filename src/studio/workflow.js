@@ -11,12 +11,19 @@ const maskKeys = [
   "maskImage",
 ];
 export function applyStyle(style, current, keepMask = false) {
-  return keepMask && current.maskMode !== "none"
-    ? {
-        ...style,
-        ...Object.fromEntries(maskKeys.map((key) => [key, current[key]])),
-      }
-    : { ...style };
+  // Applying and previewing a look share the same composition. A look replaces
+  // the main treatment, while framing and added layers belong to the workspace.
+  return {
+    ...style,
+    stack: current.stack,
+    cropX: current.cropX,
+    cropY: current.cropY,
+    cropWidth: current.cropWidth,
+    cropHeight: current.cropHeight,
+    ...(keepMask && current.maskMode !== "none"
+      ? Object.fromEntries(maskKeys.map(key => [key, current[key]]))
+      : {}),
+  };
 }
 export function videoPreferences(input) {
   const p = input && typeof input === "object" ? input : {};

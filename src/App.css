@@ -264,7 +264,7 @@ details[open] > summary::after { content: "−"; }
 .export-progress { padding-top: 24px; }
 .export-progress > div { display: flex; justify-content: space-between; gap: 12px; font-size: .875rem; }
 .export-progress progress { display: block; width: 100%; height: 8px; margin: 16px 0; accent-color: var(--accent); }
-.export-result { display: flex; flex-direction: column; gap: 12px; padding: 20px; margin-top: 24px; border: 1px solid var(--accent); border-radius: 12px; }
+.export-result { display: flex; flex-direction: column; gap: 12px; padding: 20px; margin: 0 0 20px; border: 1px solid var(--accent); border-radius: 12px; }
 .export-result strong { overflow-wrap: anywhere; font-size: .9375rem; }
 .export-result > span:not(.eyebrow) { color: var(--muted); font-size: .8125rem; }
 .inline-error { color: var(--error); font-size: .875rem; line-height: 1.6; margin: 14px 0; }
@@ -445,3 +445,6 @@ kbd { display: inline-block; font-size: .8125rem; padding: 2px 6px; border: 1px 
 
 .stack-heading { justify-content: space-between; padding: 0; margin-bottom: 8px; font-size: .8125rem; }
 .stack-heading span { color: var(--muted); font-size: .75rem; }
+
+.export-settings > summary { font-size: .875rem; font-weight: 600; min-height: 44px; margin-bottom: 12px; cursor: pointer; }
+.export-settings:not([open]) > summary { margin-bottom: 0; }

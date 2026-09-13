@@ -11,6 +11,7 @@ export function StyleBrowser({
   config,
   source,
   time,
+  trim,
   keepMask,
   setKeepMask,
   busy,
@@ -37,7 +38,7 @@ export function StyleBrowser({
     setPreviews({});
     setRendering(false);
     setError("");
-  }, [config, source, keepMask, collection, technique, query]);
+  }, [config, source, keepMask, collection, technique, query, time, trim]);
   useEffect(() => setQuery(""), [collection]);
   const close = () => {
     controller.current?.abort();
@@ -67,19 +68,14 @@ export function StyleBrowser({
       const output = document.createElement("canvas");
       for (const look of visibleLooks) {
         if (abort.signal.aborted) break;
-        const c = {
-          ...applyStyle(look.config, config, keepMask),
-          cropX: config.cropX,
-          cropY: config.cropY,
-          cropWidth: config.cropWidth,
-          cropHeight: config.cropHeight,
-        };
+        const c = applyStyle(look.config, config, keepMask);
         const size = frameDimensions(source, c, "240");
         service.invalidate();
         const echoFrames = await echoes.frames(time, c, abort.signal);
         await service.render(snapshot, output, c, size.width, size.height, {
           signal: abort.signal,
           time,
+          motionRange: trim,
           echoFrames,
         });
         if (!abort.signal.aborted)
@@ -135,6 +131,7 @@ export function StyleBrowser({
         </select>
       </label>}
       {config.maskMode !== "none" && <label className="check style-options"><input type="checkbox" checked={keepMask} onChange={e => setKeepMask(e.target.checked)} disabled={busy} /><span>Keep selection when changing looks</span></label>}
+      {config.stack.length > 1 && <p className="hint">Looks replace the main effect. Frame previews include your added layers.</p>}
       <button className="full style-preview-button" onClick={rendering ? close : preview} disabled={busy || !visibleLooks.length}>
         {rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview looks on this frame"}
       </button>
