@@ -15,7 +15,7 @@ export function MotionControls({ config, set, source, trim, time, seekTo }) {
     if (!key) return;
     update({ enabled: true, tracks: { ...motion.tracks, [key]: [config[key], config[key]] } });
   };
-  if (!["video", "demo"].includes(source.kind)) return <section>
+  if (!["video", "demo"].includes(source.kind)) return <section className="motion-controls">
     <h2>Motion</h2><p className="hint">Open a video to animate its effects across the selected trim. For camera footage, save a recording and open it here.</p>
   </section>;
   return <section className="motion-controls">
