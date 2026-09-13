@@ -1,3 +1,4 @@
+import { sanitizeMotion } from "./motion";
 import { charPalettes, paletteSets, asciiVariants, fonts } from "../constants";
 export { asciiVariants, fonts };
 export const palettes = {
@@ -128,6 +129,7 @@ export const methods = [
   ["sierra", "Sierra"],
 ];
 export const defaults = {
+  motion: sanitizeMotion(),
   effect: "dither",
   method: "ordered",
   palette: "Paper",
@@ -285,6 +287,7 @@ export function sanitizeConfig(input = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return c;
   for (const [k, v] of Object.entries(input)) {
     if (!Object.hasOwn(c, k)) continue;
+    if (k === "motion") { c.motion = sanitizeMotion(v); continue; }
     if (k === "maskStrokes") {
       if (Array.isArray(v))
         c.maskStrokes = v

@@ -404,3 +404,28 @@ test("cancelling a slow import restores the workspace without discarding the cur
   expect(screen.getByRole("button", { name: "Change effect" })).toHaveTextContent("ASCII");
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
+
+test("motion endpoints are editable, seekable, reversible, and passed to exports", async () => {
+  vi.stubGlobal("VideoEncoder", class {});
+  const planner = await import("./studio/export-plan");
+  vi.spyOn(planner, "planVideoExport").mockResolvedValue({ extension: "mp4", codec: "avc", estimatedBytes: 1000 });
+  const exporter = await import("./studio/precise-export");
+  const encode = vi.spyOn(exporter, "exportPrecise").mockResolvedValue({ blob: new Blob(["fixture"]), extension: "mp4", width: 1280, height: 720 });
+  URL.createObjectURL = vi.fn(() => "blob:motion"); URL.revokeObjectURL = vi.fn();
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Motion", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Start with an effect reveal" }));
+  expect(screen.getByRole("checkbox", { name: "Animate effects" })).toBeChecked();
+  expect(screen.getByRole("slider", { name: "Effect blend · start", exact: true })).toHaveValue("0");
+  fireEvent.click(screen.getByRole("button", { name: /End 00:08/ }));
+  expect(screen.getByRole("slider", { name: "Video playhead" })).toHaveValue("8");
+  fireEvent.change(screen.getByRole("slider", { name: "Effect blend · end", exact: true }), { target: { value: "0.75" } });
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(screen.getByRole("slider", { name: "Effect blend · end", exact: true })).toHaveValue("1");
+  fireEvent.click(screen.getByRole("button", { name: "Redo", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Export", exact: true }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Create export" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Create export" }));
+  await screen.findByRole("link", { name: "Download MP4" });
+  expect(encode.mock.lastCall[0]).toMatchObject({ start: 0, end: 8, config: { motion: { enabled: true, tracks: { effectMix: [0, 0.75] } } } });
+});

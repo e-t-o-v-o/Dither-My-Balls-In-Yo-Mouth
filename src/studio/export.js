@@ -38,6 +38,8 @@ export async function exportStill({
   resolution,
   format,
   time = 0,
+  start,
+  end,
   fontFace = "",
   font,
   signal,
@@ -66,7 +68,7 @@ export async function exportStill({
       { ...config, smooth: 1 },
       width,
       height,
-      { signal, time, format, fontFace, font, echoFrames },
+      { signal, time, format, fontFace, font, echoFrames, motionRange: ["video", "demo"].includes(source.kind) ? [start, end] : undefined },
     );
     checkAbort(signal);
     return { blob, extension: format, width, height };
@@ -111,7 +113,7 @@ export async function recordVideo({
       config,
       width,
       height,
-      { time, flatten: true, signal, font, echoFrames },
+      { time, flatten: true, signal, font, echoFrames, motionRange: ["video", "demo"].includes(source.kind) ? [start, end] : undefined },
     );
   };
   try {
@@ -375,7 +377,7 @@ export async function exportGIF({
         config,
         width,
         height,
-        { time, flatten: true, signal, font, echoFrames },
+        { time, flatten: true, signal, font, echoFrames, motionRange: ["video", "demo"].includes(source.kind) ? [start, end] : undefined },
       );
       gif.addFrame(canvas, {
         copy: true,

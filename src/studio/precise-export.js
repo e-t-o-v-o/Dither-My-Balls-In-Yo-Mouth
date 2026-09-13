@@ -18,9 +18,11 @@ export async function exportPrecise({
   quality = "high",
   signal,
   onProgress,
+  onStatus,
   font,
 }) {
   checkAbort(signal);
+  onStatus?.("preparing");
   const plan = await planVideoExport({
     source,
     config,
@@ -41,18 +43,8 @@ export async function exportPrecise({
   canvas.height = height;
   const renderer = new RenderService(),
     echoes = new EchoSampler(source);
-  const storage = await createExportTarget(m, plan, signal);
-  const target = storage.target;
+  let storage, output;
   let completed = false;
-  const output = new m.Output({
-    format:
-      extension === "mp4"
-        ? new m.Mp4OutputFormat({
-            fastStart: storage.disk ? false : "in-memory",
-          })
-        : new m.WebMOutputFormat(),
-    target,
-  });
   let input,
     conversion,
     frames = 0;
@@ -65,11 +57,18 @@ export async function exportPrecise({
     checkAbort(signal);
   };
   const abort = () => {
-    void (conversion ? conversion.cancel() : output.cancel()).catch(() => {});
+    void (conversion ? conversion.cancel() : output?.cancel())?.catch(() => {});
   };
   signal?.addEventListener("abort", abort, { once: true });
   try {
+    storage = await createExportTarget(m, plan, signal);
     checkAbort(signal);
+    output = new m.Output({
+      format: extension === "mp4"
+        ? new m.Mp4OutputFormat({ fastStart: storage.disk ? false : "in-memory" })
+        : new m.WebMOutputFormat(),
+      target: storage.target,
+    });
     if (source.kind === "video") {
       if (!source.file)
         throw new Error("Reopen your video to use frame-by-frame export.");
@@ -93,13 +92,17 @@ export async function exportPrecise({
           processedHeight: height,
           process: async (sample) => {
             await yieldUI();
+            // Conversion rebases samples to zero before process(). Effects and
+            // echo sampling share preview's original-media clock, not that clock.
+            const sourceTime = start + sample.timestamp;
             const echoFrames = await echoes.frames(
-              sample.timestamp,
+              sourceTime,
               config,
               signal,
             );
             await renderer.render(sample, canvas, config, width, height, {
-              time: sample.timestamp,
+              time: sourceTime,
+              motionRange: [start, end],
               flatten: true,
               signal,
               font,
@@ -126,7 +129,11 @@ export async function exportPrecise({
         );
       if (!conversion.utilizedTracks.some((t) => t.isVideoTrack()))
         throw new Error("No decodable video track was found.");
-      conversion.onProgress = (p) => onProgress?.(p * 0.98);
+      conversion.onProgress = (p) => {
+        onStatus?.(p >= 1 ? "finalizing" : "rendering");
+        onProgress?.(p * 0.98);
+      };
+      onStatus?.("rendering");
       await conversion.execute();
     } else if (source.kind === "demo") {
       const video = new m.CanvasSource(canvas, {
@@ -136,6 +143,7 @@ export async function exportPrecise({
       });
       output.addVideoTrack(video, { frameRate: fps });
       await output.start();
+      onStatus?.("rendering");
       const signalCanvas = document.createElement("canvas");
       const count = Math.ceil(duration * fps);
       for (let frame = 0; frame < count; frame++) {
@@ -148,13 +156,14 @@ export async function exportPrecise({
           config,
           width,
           height,
-          { time: at, flatten: true, signal, font, echoFrames },
+          { time: at, motionRange: [start, end], flatten: true, signal, font, echoFrames },
         );
         await video.add(frame / fps, Math.min(1 / fps, duration - frame / fps));
         frames++;
         onProgress?.((frames / count) * 0.98);
       }
       video.close();
+      onStatus?.("finalizing");
       await output.finalize();
     } else throw new Error("Live camera input needs Live recording.");
     checkAbort(signal);
@@ -180,11 +189,11 @@ export async function exportPrecise({
     throw e;
   } finally {
     signal?.removeEventListener("abort", abort);
-    if (output.state !== "finalized" && output.state !== "canceled")
+    if (output && output.state !== "finalized" && output.state !== "canceled")
       await output.cancel().catch(() => {});
     input?.dispose();
     renderer.dispose();
     echoes.dispose();
-    if (!completed) await storage.cleanup();
+    if (!completed) await storage?.cleanup();
   }
 }

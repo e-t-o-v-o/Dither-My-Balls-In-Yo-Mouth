@@ -1,3 +1,4 @@
+import { configAtTime } from "./motion";
 import { FrameRenderer, SVGContext } from "./renderer";
 import { makeCanvas, canvasBlob } from "./canvas";
 import { checkAbort, abortError } from "./media";
@@ -37,6 +38,7 @@ export class RenderService {
       fontFace = "",
       echoFrames,
     } = options;
+    config = configAtTime(config, time, options.motionRange);
     checkAbort(signal);
     if (this.disposed) throw abortError();
     if (this.pending) throw new Error("A frame is already being rendered.");

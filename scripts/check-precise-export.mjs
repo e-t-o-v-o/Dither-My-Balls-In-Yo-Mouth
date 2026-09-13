@@ -248,6 +248,32 @@ try {
       elapsedMs: Math.round(performance.now() - started),
     });
   }
+  // A static gray source isolates animation from source motion. These decoded
+  // pixels catch trim-relative timestamp errors that moving fixtures cannot.
+  const grayFile = path.join(dir, "gray.mp4");
+  execFileSync("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "color=c=gray:size=160x90:rate=30", "-t", "3", "-c:v", "libx264", "-pix_fmt", "yuv420p", grayFile]);
+  const graySource = { kind: "video", file: new Blob([await readFile(grayFile)]), width: 160, height: 90 };
+  for (const [format, playback] of [["mp4", "once"], ["webm", "return"]]) {
+    const output = await exportPrecise({
+      source: graySource, config: { ...defaults, effect: "pixel", cellSize: 4,
+        motion: { enabled: true, easing: "linear", playback, tracks: { brightness: [-100, 100] } } },
+      resolution: "native", format, fps: 30, start: 0.5, end: 2.5, includeAudio: false,
+    });
+    const file = path.join(dir, `motion.${format}`);
+    await writeFile(file, new Uint8Array(await output.blob.arrayBuffer()));
+    const pixels = execFileSync("ffmpeg", ["-v", "error", "-i", file, "-vf", "scale=1:1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]).filter((_, i) => i % 3 === 0);
+    assert.equal(pixels.length, 60, "Animated trim has exactly 60 frames");
+    assert.ok(pixels[0] < 60, `Animation starts at its dark endpoint after trim: ${pixels[0]}`);
+    if (playback === "once") {
+      assert.ok(pixels[30] > 115 && pixels[30] < 140, `Animation midpoint matches source time: ${pixels[30]}`);
+      assert.ok(pixels[59] > 195, `Animation ends at its light endpoint: ${pixels[59]}`);
+    } else {
+      assert.ok(pixels[30] > 200, `Return animation reaches its destination halfway: ${pixels[30]}`);
+      assert.ok(pixels[59] < 65, `Return animation closes at its starting value: ${pixels[59]}`);
+    }
+    await output.cleanup?.();
+    results.push({ case: `trimmed ${playback} animation`, format, first: pixels[0], middle: pixels[30], last: pixels[59], frames: pixels.length });
+  }
   // Cancellation must reject cleanly and allow the next export to succeed.
   const controller = new AbortController();
   await assert.rejects(
