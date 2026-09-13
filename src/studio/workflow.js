@@ -48,7 +48,7 @@ export function exportKey({
     format,
     resolution,
     ...(still
-      ? { time, ...(config.motion?.enabled ? { start, end } : {}), fontFace: format === "svg" ? fontFace : undefined }
+      ? { time, ...((config.motion?.enabled || config.stack?.some(layer => layer.settings?.motion?.enabled)) ? { start, end } : {}), fontFace: format === "svg" ? fontFace : undefined }
       : {
           start,
           end,

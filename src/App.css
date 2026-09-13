@@ -420,3 +420,28 @@ kbd { display: inline-block; font-size: .8125rem; padding: 2px 6px; border: 1px 
 .motion-readout { display: flex; justify-content: space-between; align-items: center; }
 
 .motion-active { margin: 16px 22px 0; font-size: .8125rem; color: var(--accent); }
+
+.export-review { border-top: 1px solid var(--line); padding-top: 16px; min-width: 0; }
+.export-review h3 { font-size: .9375rem; margin: 0; }
+.export-review video, .export-review img { display: block; width: 100%; max-height: min(42dvh, 360px); object-fit: contain; border-radius: 8px; background: var(--canvas); margin: 12px 0; }
+.export-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 0; font-size: .8125rem; }
+.export-metadata dt { color: var(--muted); margin-bottom: 4px; }
+.export-metadata dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.effect-stack { padding: 20px 22px; border-bottom: 1px solid var(--line); }
+.effect-stack h2 { font-size: .9375rem; margin: 0; }
+.stack-list { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 8px; }
+.stack-list li { border: 1px solid var(--line); border-radius: 10px; padding: 4px 8px; }
+.stack-list li[data-active="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--panel)); }
+.stack-layer-title { display: flex; align-items: center; gap: 8px; }
+.stack-layer-title > span { color: var(--muted); font-size: .75rem; }
+.stack-layer-title button { flex: 1; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 6px; min-width: 0; }
+.stack-layer-title small { color: var(--muted); font-size: .6875rem; }
+.stack-layer-title strong { font-size: .8125rem; }
+.stack-list li[data-bypassed="true"] strong { color: var(--muted); text-decoration: line-through; }
+.stack-enable { display: grid; place-items: center; min-width: 44px; min-height: 44px; cursor: pointer; }
+.stack-enable input { accent-color: var(--accent); width: 16px; height: 16px; }
+.stack-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.stack-actions .small { min-width: 44px; min-height: 44px; }
+
+.stack-heading { justify-content: space-between; padding: 0; margin-bottom: 8px; font-size: .8125rem; }
+.stack-heading span { color: var(--muted); font-size: .75rem; }

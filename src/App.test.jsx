@@ -10,6 +10,8 @@ vi.mock("./studio/renderer", () => ({
 }));
 beforeEach(() => {
   localStorage.clear();
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
   HTMLCanvasElement.prototype.getContext = () => ({
     clearRect: () => {},
     drawImage: () => {},
@@ -428,4 +430,22 @@ test("motion endpoints are editable, seekable, reversible, and passed to exports
   fireEvent.click(screen.getByRole("button", { name: "Create export" }));
   await screen.findByRole("link", { name: "Download MP4" });
   expect(encode.mock.lastCall[0]).toMatchObject({ start: 0, end: 8, config: { motion: { enabled: true, tracks: { effectMix: [0, 0.75] } } } });
+});
+
+test("effect stacks add, reorder, bypass, edit independently, and undo without losing layers", () => {
+  render(<App />);
+  fireEvent.change(screen.getByRole("combobox", { name: "Add effect", exact: true }), { target: { value: "marbling" } });
+  expect(screen.getByRole("button", { name: "Change effect", exact: true })).toHaveTextContent("Marbled ink");
+  fireEvent.change(screen.getByRole("combobox", { name: "Add effect", exact: true }), { target: { value: "screenprint" } });
+  expect(screen.queryByRole("combobox", { name: "Add effect", exact: true })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Move layer 3 up" }));
+  expect(screen.getByRole("button", { name: "Edit Screenprint layer 2" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("checkbox", { name: "Enable Screenprint layer 2" }));
+  expect(screen.getByText(/This effect is bypassed/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(screen.getByRole("checkbox", { name: "Enable Screenprint layer 2" })).toBeChecked();
+  fireEvent.click(screen.getByRole("button", { name: "Edit Dither layer 1" }));
+  expect(screen.getByRole("button", { name: "Change effect", exact: true })).toHaveTextContent("Dither");
+  fireEvent.click(screen.getByRole("button", { name: "Remove Marbled ink layer 3" }));
+  expect(screen.getByRole("combobox", { name: "Add effect", exact: true })).toBeInTheDocument();
 });

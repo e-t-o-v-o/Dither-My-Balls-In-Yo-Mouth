@@ -8,6 +8,11 @@ export function frameDimensions(source, config, resolution, even = false) {
   );
 }
 export function drawSource(source, ctx, config, width, height) {
+  if (config.sourceFramed) {
+    if (typeof source.draw === "function") source.draw(ctx, 0, 0, width, height);
+    else ctx.drawImage(source, 0, 0, width, height);
+    return;
+  }
   const w = width / (config.cropWidth || 1),
     h = height / (config.cropHeight || 1);
   const x = -(config.cropX || 0) * w,

@@ -9,6 +9,7 @@ import { GraphicRenderer } from "./graphics";
 import { InterlaceRenderer } from "./interlace";
 import { ArtisticRenderer } from "./artistic";
 import { makeCanvas } from "./canvas";
+import { activeLayers, layerConfig } from "./stack";
 function resize(c, w, h) {
   if (c.width !== w) c.width = w;
   if (c.height !== h) c.height = h;
@@ -79,6 +80,7 @@ export class FrameRenderer {
   invalidate() {
     this.reset = true;
     this.lastTime = null;
+    this.stackRenderers?.forEach(renderer => renderer.invalidate());
   }
   render(
     source,
@@ -117,6 +119,7 @@ export class FrameRenderer {
       canvas.getContext("2d").putImageData(image, 0, 0);
       return canvas;
     }
+    if (c.stack?.length) return this.renderStack(source, canvas, c, width, height, overrideContext, time, flatten, echoFrames);
     const echoes = echoFrames || [];
     if (c.effectMix === 1 && !c.grain && !echoes.length)
       return this.renderCore(
@@ -171,6 +174,53 @@ export class FrameRenderer {
       ctx.globalAlpha = 1;
     }
     this.finishing.paper(ctx, c, width, height);
+    return canvas;
+  }
+  renderStack(source, canvas, c, width, height, overrideContext, time, flatten, echoFrames) {
+    const layers = activeLayers(c);
+    this.stackRenderers ||= new Map();
+    for (const id of this.stackRenderers.keys())
+      if (!layers.some(layer => layer.id === id)) this.stackRenderers.delete(id);
+    // A bypassed stack costs no extra raster pass and matches single-effect output.
+    if (layers.length === 1 && layers[0].id === "main")
+      return this.render(source, canvas, { ...c, stack: [], effectMix: c.effectMix * layers[0].mix }, width, height, overrideContext, time, flatten, echoFrames);
+    this.stackSource ||= makeCanvas();
+    this.stackBuffers ||= [makeCanvas(), makeCanvas()];
+    resize(this.stackSource, width, height);
+    const sc = this.stackSource.getContext("2d");
+    sc.clearRect(0, 0, width, height);
+    drawSource(source, sc, c, width, height);
+    let input = this.stackSource;
+    if (!layers.length) {
+      resize(canvas, width, height);
+      const ctx = overrideContext || canvas.getContext("2d");
+      ctx.clearRect(0, 0, width, height);
+      if (flatten) { ctx.fillStyle = c.bgColor; ctx.fillRect(0, 0, width, height); }
+      ctx.drawImage(input, 0, 0, width, height);
+      return canvas;
+    }
+    // Echoes are source-time samples. Frame them once too; mask coordinates
+    // remain source-attached through the main layer's original crop settings.
+    this.stackEchoes ||= [];
+    const echoes = (echoFrames || []).map((frame, index) => {
+      const target = this.stackEchoes[index] ||= makeCanvas();
+      const scale = Math.min(1, 480 / Math.max(width, height));
+      resize(target, Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale)));
+      const ctx = target.getContext("2d"); ctx.clearRect(0, 0, target.width, target.height);
+      drawSource(frame.bitmap || frame.source, ctx, c, target.width, target.height);
+      return { source: target, time: frame.time };
+    });
+    for (const [index, layer] of layers.entries()) {
+      const main = layer.id === "main", last = index === layers.length - 1;
+      if (!main && !this.stackRenderers.has(layer.id)) this.stackRenderers.set(layer.id, new FrameRenderer());
+      const renderer = main ? this : this.stackRenderers.get(layer.id);
+      const settings = layerConfig(c, layer);
+      const stage = { ...settings, stack: [], sourceFramed: true, effectMix: settings.effectMix * layer.mix,
+        smooth: c.stillExport ? 1 : settings.smooth };
+      const output = last ? canvas : this.stackBuffers[index % 2];
+      renderer.render(input, output, stage, width, height, last ? overrideContext : null, time, last && flatten, main ? echoes : []);
+      input = output;
+    }
     return canvas;
   }
   renderCore(

@@ -148,6 +148,11 @@ try {
     for (const [effect, name] of effects)
       if (!covered.has(effect)) cases.push(["mp4", { name, config: { ...defaults, effect } }]);
   }
+  const stage = (effect, mix, settings = {}) => ({ id: effect, enabled: true, mix, settings: { ...defaults, effect, cellSize: 32, ...settings } });
+  cases.push(["mp4", { name: "Textile print stack", config: { ...looks.find(look => look.name === "Silk study").config,
+    stack: [{ id: "main", enabled: true, mix: 1 }, stage("screenprint", 0.35), stage("symbols", 0.25)] } }]);
+  cases.push(["webm", { name: "Reordered echo stack", config: { ...looks.find(look => look.name === "Carbon echoes").config,
+    stack: [stage("guilloche", 0.45), { id: "main", enabled: true, mix: 1 }, stage("mosaic", 0.4)] } }]);
   for (const [format, lookName] of cases) {
     const config = {
       ...(typeof lookName === "string" ? looks.find(look => look.name === lookName) : lookName).config,
@@ -239,6 +244,7 @@ try {
     );
     results.push({
       effect: config.effect,
+      layers: config.stack?.length || 1,
       format: output.extension,
       video: video.codec_name,
       audio: audio.codec_name,
@@ -254,9 +260,11 @@ try {
   execFileSync("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "color=c=gray:size=160x90:rate=30", "-t", "3", "-c:v", "libx264", "-pix_fmt", "yuv420p", grayFile]);
   const graySource = { kind: "video", file: new Blob([await readFile(grayFile)]), width: 160, height: 90 };
   for (const [format, playback] of [["mp4", "once"], ["webm", "return"]]) {
+    const animated = { ...defaults, effect: "pixel", cellSize: 4,
+        motion: { enabled: true, easing: "linear", playback, tracks: { brightness: [-100, 100] } } };
     const output = await exportPrecise({
-      source: graySource, config: { ...defaults, effect: "pixel", cellSize: 4,
-        motion: { enabled: true, easing: "linear", playback, tracks: { brightness: [-100, 100] } } },
+      source: graySource, config: format === "mp4" ? animated : { ...defaults, effect: "pixel", cellSize: 4,
+        stack: [{ id: "main", enabled: true, mix: 1 }, { id: "animated", enabled: true, mix: 1, settings: animated }] },
       resolution: "native", format, fps: 30, start: 0.5, end: 2.5, includeAudio: false,
     });
     const file = path.join(dir, `motion.${format}`);

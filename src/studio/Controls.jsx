@@ -870,14 +870,14 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
               <option key={f}>{f}</option>
             ))}
           </Select>
-          <label className="button file-button">
+          {onFontUpload && <label className="button file-button">
             Upload font
             <input
               type="file"
               accept=".ttf,.otf,.woff,.woff2"
               onChange={onFontUpload}
             />
-          </label>
+          </label>}
           <Range
             label="Glyph scale"
             value={c.fontScale}
@@ -912,6 +912,7 @@ export function ColorControls({
   set,
   motion = false,
   echoes = false,
+  echoControls = true,
 }) {
   return (
     <>
@@ -1063,6 +1064,7 @@ export function ColorControls({
           <p className="hint">
             Lower response blends frames into a soft trail.
           </p>
+          {echoControls && <>
           <Range
             label="Color echoes"
             value={echoes ? c.echoCount : 0}
@@ -1115,6 +1117,7 @@ export function ColorControls({
               </p>
             </>
           )}
+          </>}
         </section>
       )}
     </>

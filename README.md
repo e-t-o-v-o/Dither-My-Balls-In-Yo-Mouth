@@ -6,9 +6,10 @@ A local video, image, and webcam effects studio. A canvas-centered workspace ada
 
 1. Open a video or image, enable the camera, or experiment with the built-in moving test signal.
 2. Choose a classic starter in **Looks**, or explore **Artistic** for expressive materials and patterns. Tune **Effect**, **Color**, **Select**, and **Frame**, then use **Before / after** to compare. On a phone, expand the controls for detailed editing or hide them to work directly on the canvas.
-3. Scrub the timeline. Open **Trim** to drag the range handles, enter **In** and **Out** in seconds, or set either boundary at the playhead. Choose a frame-step rate for fine seeking. The highlighted range shows the export selection; **Full clip** resets it. Arrow keys seek 0.1 seconds (Shift: 1 second), and **I / O** set the trim.
-4. Open **Motion** for start/end animation. **Start with an effect reveal** fades the treatment in; add continuous color or effect controls, choose easing, or use **Start → End → Start** to return to the starting treatment. Select an endpoint to tune it, then scrub or play. Animation spans the selected trim and is saved with projects and presets. It applies to videos and the test signal; camera recordings must be opened as video first.
-5. Choose **Export**, then select a visible **File type**: **MP4**, **WebM**, **Auto**, **GIF**, **PNG**, or **SVG**. Auto chooses a supported video type and shows its choice before export; selecting MP4 requests an actual `.mp4` file. Your video-type preference is remembered. Choose the resolution and create the file. A completed export stays available behind a Download button, including on iPad. It is labeled as a previous export when relevant edits change. Video export preferences are remembered.
+3. In **Effect**, choose **Add effect** to combine up to three treatments. Expand **Effect stack** to reorder or bypass individual layers. Select a layer to adjust its blend; added layers have their own **Effect**, **Color**, and **Motion** controls. **Frame** crops the source once for the whole stack. Selection, custom fonts, and color echoes belong to the main effect; added layers use built-in fonts. The main Color and Motion tabs continue to edit the main effect. Stacks are saved in projects and presets, and work across every export type.
+4. Scrub the timeline. Open **Trim** to drag the range handles, enter **In** and **Out** in seconds, or set either boundary at the playhead. Choose a frame-step rate for fine seeking. The highlighted range shows the export selection; **Full clip** resets it. Arrow keys seek 0.1 seconds (Shift: 1 second), and **I / O** set the trim.
+5. Open **Motion** for start/end animation. **Start with an effect reveal** fades the treatment in; add continuous color or effect controls, choose easing, or use **Start → End → Start** to return to the starting treatment. Select an endpoint to tune it, then scrub or play. Animation spans the selected trim and is saved with projects and presets. It applies to videos and the test signal; camera recordings must be opened as video first.
+6. Choose **Export**, then select a visible **File type**: **MP4**, **WebM**, **Auto**, **GIF**, **PNG**, or **SVG**. Auto chooses a supported video type and shows its choice before export; selecting MP4 requests an actual `.mp4` file. Your video-type preference is remembered. Choose the resolution and create the file. Play the finished encoded video in **Review your export**, with file type, dimensions, duration, frame rate, and audio status before saving. GIF preview starts only when requested. A completed export stays available behind a Download button, including on iPad. It is labeled as a previous export when relevant edits change. Video export preferences are remembered.
 
 The app never uploads your media. Settings and named presets are stored locally, with validated JSON import/export for backups. Original media is unchanged. Project files and local autosaves also preserve framing, trim, selections, per-effect settings, and the active custom font. Relink the original media when reopening a project on another device. Fonts are embedded in SVG exports.
 
@@ -27,6 +28,7 @@ Video import starts muted decoding and opens on a paused first frame. If the bro
 - Brightness, contrast, saturation, inversion, transparency, chroma keying, and temporal smoothing.
 - Video playback, scrubbing, looping, trim controls, audio monitoring, and undo/redo of effect settings and trim, with separate remembered settings for each effect.
 - Shared animation evaluation in worker and compatibility rendering, MP4/WebM, GIF, and current-frame PNG/SVG. No animated frame dimensions or random seeds; discrete pattern changes remain deliberate edits.
+- Up to three ordered effects with independent blend, bypass, and animation. Disabled layers skip rendering; intermediate canvases are reused.
 - Export stages, elapsed time, and approximate remaining time after enough progress. A stalled progress indicator gives a cancellation option without discarding edits.
 - Worker rendering with a compatibility fallback. Adaptive preview resolution reduces work during playback and refines paused frames. Export resolution stays independent.
 - Source-attached selections and shared Original/16:9/9:16/Square/4:5 framing across preview and export; filmstrip trim handles and precise numeric controls.
@@ -79,6 +81,7 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 - Animated GIF input is an image source, not an editable video timeline. Import video for controlled animated conversion.
 - Browser-supported input codecs determine which video files can open. An MP4 or MOV container does not guarantee a decodable codec. H.264 MP4 is a useful interchange format.
 - Frame response blends preceding rendered frames. PNG/SVG stills omit that soft trail; video/GIF initialize it at the trim start. Color echoes are separate: they sample fixed source times and are also available in still exports from clips. Echoes use 480 px silhouette samples and are unavailable for live cameras or image sources.
+- Stacked SVG retains vector geometry for the final active effect and rasterizes preceding stages at the selected output resolution. Blending embeds the preceding image. It does not preserve every layer as editable vectors.
 - Screenprint PNG/video uses analytic raster coverage; SVG retains editable ink geometry. Antialiasing can differ at very small screen sizes. Paper grain, original underlays, source mixing, and echo silhouettes embed raster layers in SVG.
 - Processing uses the browser’s SDR canvas color pipeline. This is not an HDR or print-proofing color-management tool.
 
@@ -96,6 +99,8 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 - `src/studio/CropEditor.jsx`, `crop-geometry.js`, `TimeField.jsx`: staged source framing and precise committed values.
 - `src/studio/Timeline.jsx`, `Filmstrip.jsx`, `StyleBrowser.jsx`: compact video controls and on-demand style previews.
 - `src/studio/export-plan.js`, `export-storage.js`: export preflight and temporary disk-backed output.
+- `src/studio/EffectStack.jsx`, `stack.js`: bounded layer editing and shared ordering.
+- `src/studio/ExportReview.jsx`: finished-file playback and metadata.
 - `src/studio/Controls.jsx`: accessible inspector controls and icons.
 - `src/studio/model.js`: settings validation, legacy migration, palettes, dimensions, and formatting.
 - `src/studio/pixels.js`: pure pixel adjustments, six dithering kernels, and edge detection.

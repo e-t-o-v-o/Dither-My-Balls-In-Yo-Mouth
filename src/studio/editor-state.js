@@ -59,7 +59,7 @@ export function historyReducer(state, action) {
     JSON.stringify(trim) === JSON.stringify(state.trim)
   )
     return state;
-  const group = state.gesture ? "gesture" : action.type === "trim" ? "trim" : action.key === "motion" ? null : action.key;
+  const group = state.gesture ? "gesture" : action.type === "trim" ? "trim" : ["motion", "stack"].includes(action.key) ? null : action.key;
   const grouped = group && state.group === group && (state.gesture || Date.now() - state.at < 500);
   return {
     past: grouped ? state.past : [...state.past, snapshot(state)].slice(-80),
