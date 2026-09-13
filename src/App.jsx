@@ -33,6 +33,9 @@ import { StyleBrowser } from "./studio/StyleBrowser";
 import { Timeline } from "./studio/Timeline";
 import { ProjectDownload } from "./studio/ProjectDownload";
 import { ExportProgress } from "./studio/ExportProgress";
+import { EffectStack } from "./studio/EffectStack";
+import { activeLayers, layerConfig } from "./studio/stack";
+import { ExportReview } from "./studio/ExportReview";
 import { MotionControls } from "./studio/MotionControls";
 import { ExportFormat } from "./studio/ExportFormat";
 import { CropEditor } from "./studio/CropEditor";
@@ -60,7 +63,6 @@ import {
 } from "./studio/export";
 import {
   Icon,
-  EffectControls,
   ColorControls,
   MaskControls,
   Select,
@@ -942,7 +944,7 @@ function App() {
           end: trim[1],
           fontFace: fontFaces.current[c.font]?.css || "",
         }),
-        effectName: effects.find(([id]) => id === c.effect)?.[1],
+        effectName: activeLayers(c).map(layer => effects.find(([id]) => id === layerConfig(c, layer).effect)?.[1]).join(" → ") || "Original",
         selection: still
           ? `Frame at ${timeLabel(at)}`
           : `${timeLabel(trim[0])} – ${timeLabel(trim[1])}`,
@@ -1018,6 +1020,7 @@ function App() {
         dispatch({
           config: {
             ...applyStyle(look.config, config, keepMask),
+            stack: config.stack,
             cropX: config.cropX,
             cropY: config.cropY,
             cropWidth: config.cropWidth,
@@ -1258,7 +1261,8 @@ function App() {
             <fieldset className="control-fieldset" disabled={busy || loading}>
               {["effects", "color"].includes(tab) && config.motion.enabled && ["video", "demo"].includes(source.kind) && Object.keys(config.motion.tracks).length > 0 && <button className="motion-active" onClick={() => selectTab("motion")}><Icon name="play" />Animation active · Edit motion</button>}
               {tab === "effects" && (
-                <EffectControls
+                <EffectStack
+                  source={source} trim={trim} time={time} seekTo={scrub}
                   config={config}
                   set={set}
                   customFonts={customFonts}
@@ -1665,6 +1669,7 @@ function App() {
                   exports redraw the effect geometry at the selected size.
                 </p>
               )}
+              {format === "svg" && activeLayers(config).length > 1 && <p className="hint">Stacked SVG keeps the final effect’s vector geometry. Earlier effects are rendered into its source; blends may embed raster layers.</p>}
               {unavailableFormat && <p className="inline-error" role="status">{format.toUpperCase()} is unavailable in this browser’s current export mode. Choose another file type or export mode.</p>}
               {format === "auto" && <p className="hint">Auto chooses a supported MP4 or WebM file. Select MP4 above if you need an .mp4 download.</p>}
               {exportPlan && (
@@ -1719,7 +1724,6 @@ function App() {
                   {result.effectName} · {result.selection}
                 </span>
                 <span>
-                  {result.width} × {result.height} ·{" "}
                   {(result.blob.size / 1024 / 1024).toFixed(2)} MB
                 </span>
                 {!resultCurrent && (
@@ -1728,10 +1732,10 @@ function App() {
                     export to apply them.
                   </p>
                 )}
+                <ExportReview key={result.url} result={result} />
                 {result.engine === "precise" && (
                   <p className="hint">
-                    {result.targetFps} fps · {result.codec.toUpperCase()} ·
-                    frame-by-frame export
+                    Frame-by-frame export
                   </p>
                 )}
                 {result.actualFps < result.targetFps * 0.85 && (

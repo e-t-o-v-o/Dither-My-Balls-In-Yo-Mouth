@@ -48,12 +48,16 @@ export function motionProgress(time, range, motion) {
   return p;
 }
 export function configAtTime(config, time, range) {
-  if (!config.motion?.enabled || !range) return config;
-  const p = motionProgress(time, range, config.motion);
+  if (!range || (!config.motion?.enabled && !config.stack?.some(layer => layer.settings?.motion?.enabled))) return config;
   const next = { ...config };
-  for (const [key] of availableMotionControls(config.effect)) {
-    const pair = config.motion.tracks[key];
-    if (pair) next[key] = pair[0] + (pair[1] - pair[0]) * p;
+  if (config.motion?.enabled) {
+    const p = motionProgress(time, range, config.motion);
+    for (const [key] of availableMotionControls(config.effect)) {
+      const pair = config.motion.tracks[key];
+      if (pair) next[key] = pair[0] + (pair[1] - pair[0]) * p;
+    }
   }
+  if (config.stack?.length) next.stack = config.stack.map(layer => layer.settings
+    ? { ...layer, settings: configAtTime(layer.settings, time, range) } : layer);
   return next;
 }

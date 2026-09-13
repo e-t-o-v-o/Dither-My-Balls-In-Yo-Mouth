@@ -33,6 +33,8 @@ export class EchoSampler {
       this.source.kind === "camera"
     )
       return [];
+    const main = config.stack?.find(layer => layer.id === "main");
+    if (main && (!main.enabled || main.mix === 0)) return [];
     const times = echoTimes(time, config.echoCount, config.echoSpacing);
     // At the start of a clip there is no history yet. Do not open a second
     // decoder (or block the first preview) until there is a frame to sample.

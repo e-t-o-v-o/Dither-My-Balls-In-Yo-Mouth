@@ -129,6 +129,7 @@ export const methods = [
   ["sierra", "Sierra"],
 ];
 export const defaults = {
+  stack: [],
   motion: sanitizeMotion(),
   effect: "dither",
   method: "ordered",
@@ -283,10 +284,34 @@ const numeric = {
   maskSoftness: [0, 0.3],
 };
 export function sanitizeConfig(input = {}) {
-  const c = { ...defaults };
+  const c = { ...defaults, stack: [] };
   if (!input || typeof input !== "object" || Array.isArray(input)) return c;
   for (const [k, v] of Object.entries(input)) {
     if (!Object.hasOwn(c, k)) continue;
+    if (k === "stack") {
+      if (!Array.isArray(v) || !v.length) continue;
+      const ids = new Set();
+      let extras = 0;
+      for (const [index, entry] of v.slice(0, 10).entries()) {
+        if (!entry || typeof entry !== "object") continue;
+        const id = entry.id === "main" ? "main" : /^[\w-]{1,64}$/.test(entry.id || "") ? entry.id : `layer-${index}`;
+        if (ids.has(id) || (id !== "main" && extras >= 2)) continue;
+        ids.add(id);
+        const layer = { id, enabled: entry.enabled !== false, mix: Number.isFinite(entry.mix) ? Math.max(0, Math.min(1, entry.mix)) : 1 };
+        if (id !== "main") {
+          extras++;
+          layer.settings = sanitizeConfig({ ...entry.settings, stack: [],
+            cropX: 0, cropY: 0, cropWidth: 1, cropHeight: 1,
+            maskMode: "none", maskImage: "", maskStrokes: [], echoCount: 0 });
+          // Added layers use built-in fonts; the main treatment retains the
+          // project's embedded custom font and source-attached selection.
+          if (!fonts.includes(layer.settings.font)) layer.settings.font = "monospace";
+        }
+        c.stack.push(layer);
+      }
+      if (!ids.has("main")) c.stack.unshift({ id: "main", enabled: true, mix: 1 });
+      continue;
+    }
     if (k === "motion") { c.motion = sanitizeMotion(v); continue; }
     if (k === "maskStrokes") {
       if (Array.isArray(v))

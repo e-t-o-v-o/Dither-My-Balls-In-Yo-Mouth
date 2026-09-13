@@ -183,6 +183,7 @@ export async function exportPrecise({
       targetFps: fps,
       engine: "precise",
       codec,
+      hasAudio: plan.needsAudio,
     };
   } catch (e) {
     if (signal?.aborted) throw abortError();

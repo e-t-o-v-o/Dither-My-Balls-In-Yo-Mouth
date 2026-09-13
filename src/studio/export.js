@@ -2,6 +2,7 @@ import { FrameRenderer, drawSignal, SVGContext } from "./renderer";
 import { frameDimensions } from "./framing";
 import { EchoSampler } from "./echo-sampler";
 import { RenderService } from "./render-service";
+import { activeLayers, layerConfig } from "./stack";
 import { seek, checkAbort, abortError } from "./media";
 export function recordingFormats(
   recorder = typeof MediaRecorder !== "undefined" ? MediaRecorder : null,
@@ -51,9 +52,11 @@ export async function exportStill({
   const renderer = new RenderService(),
     echoes = new EchoSampler(source);
   const { width, height } = frameDimensions(source, config, resolution);
+  const finalLayer = activeLayers(config).at(-1);
+  const vectorConfig = finalLayer ? layerConfig(config, finalLayer) : config;
   if (
-    format === "svg" &&
-    (Math.ceil(1920 / config.cellSize) ** 2 * Math.min(width, height)) /
+    format === "svg" && finalLayer &&
+    (Math.ceil(1920 / vectorConfig.cellSize) ** 2 * Math.min(width, height)) /
       Math.max(width, height) >
       250000
   )
@@ -65,7 +68,7 @@ export async function exportStill({
     const { blob } = await renderer.render(
       sourceFrame(source, time, signalCanvas),
       canvas,
-      { ...config, smooth: 1 },
+      { ...config, smooth: 1, stillExport: true },
       width,
       height,
       { signal, time, format, fontFace, font, echoFrames, motionRange: ["video", "demo"].includes(source.kind) ? [start, end] : undefined },
@@ -252,7 +255,9 @@ export async function recordVideo({
         width,
         height,
         frames,
-        duration: end - start,
+        duration: elapsed / 1000,
+        hasAudio: !!audioStream?.getAudioTracks().length,
+        engine: "live",
         actualFps: Math.min(fps, frames / (end - start)),
         targetFps: fps,
       });
@@ -411,7 +416,7 @@ export async function exportGIF({
       });
       gif.render();
     });
-    return { blob, extension: "gif", width, height };
+    return { blob, extension: "gif", width, height, duration: end - start, targetFps: fps, hasAudio: false };
   } finally {
     renderer.dispose();
     echoes.dispose();
