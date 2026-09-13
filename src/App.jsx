@@ -115,6 +115,8 @@ function App() {
       initialHistory,
     ),
     config = history.present;
+  const enabledLayers = activeLayers(config);
+  const stackSummary = enabledLayers.map(layer => effects.find(([id]) => id === layerConfig(config, layer).effect)?.[1]).join(" → ") || "Original";
   const paletteEffect = usesPalette(config);
   const colorSummary =
     config.effect === "screenprint" && config.screenMode === "cmyk"
@@ -1415,9 +1417,9 @@ function App() {
           </div>
           <div className="inspector-bottom">
             <span className="mono">
-              {effects.find(([id]) => id === config.effect)?.[1]}
+              {config.stack.length ? `${enabledLayers.length} active effects` : stackSummary}
             </span>
-            <span>{colorSummary}</span>
+            <span>{config.stack.length ? "Effect stack" : colorSummary}</span>
           </div>
         </aside>
       </main>
@@ -1599,8 +1601,7 @@ function App() {
               </span>
               <strong>{source.name}</strong>
               <span>
-                {effects.find(([id]) => id === config.effect)?.[1]} /{" "}
-                {paletteEffect ? config.palette : colorSummary}
+                {stackSummary}{!config.stack.length && ` / ${paletteEffect ? config.palette : colorSummary}`}
               </span>
             </div>
             <fieldset className="control-fieldset" disabled={busy}>

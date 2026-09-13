@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { EffectControls, ColorControls, Range, Select } from "./Controls";
+import { EffectControls, ColorControls, Range, Select, Icon } from "./Controls";
 import { MotionControls } from "./MotionControls";
 import { defaults, effects, sanitizeConfig } from "./model";
 import { effectDefaults, effectSnapshot } from "./effect-registry";
@@ -35,8 +35,8 @@ export function EffectStack({ config, set, source, trim, time, seekTo, customFon
             <label className="stack-enable" title={layer.enabled ? "Bypass this effect" : "Enable this effect"}><input type="checkbox" aria-label={`Enable ${name(layer)} layer ${index + 1}`} checked={layer.enabled} onChange={event => patch(layer.id, { enabled: event.target.checked })} /></label>
           </div>
           {layers.length > 1 && <div className="stack-actions">
-            <button className="small" aria-label={`Move layer ${index + 1} up`} disabled={index === 0} onClick={() => save(moveLayer(layers, layer.id, -1))}>↑</button>
-            <button className="small" aria-label={`Move layer ${index + 1} down`} disabled={index === layers.length - 1} onClick={() => save(moveLayer(layers, layer.id, 1))}>↓</button>
+            <button className="small" aria-label={`Move layer ${index + 1} up`} disabled={index === 0} onClick={() => save(moveLayer(layers, layer.id, -1))}><Icon name="chevron" style={{ transform: "rotate(180deg)" }} /></button>
+            <button className="small" aria-label={`Move layer ${index + 1} down`} disabled={index === layers.length - 1} onClick={() => save(moveLayer(layers, layer.id, 1))}><Icon name="chevron" /></button>
             {layer.id !== "main" && <button className="small" aria-label={`Remove ${name(layer)} layer ${index + 1}`} onClick={() => { save(layers.filter(item => item.id !== layer.id)); if (editing === layer.id) setEditing("main"); }}>Remove</button>}
           </div>}
         </li>)}
