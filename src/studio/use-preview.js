@@ -24,6 +24,8 @@ export function usePreview(options) {
     options.rendererRef.current?.invalidate();
   }, [
     options.config,
+    options.trimRef.current[0],
+    options.trimRef.current[1],
     options.source,
     options.revision,
     options.previewSize,
@@ -168,6 +170,7 @@ export function usePreview(options) {
           size.height,
           {
             time: t,
+            motionRange: ["video", "demo"].includes(o.source.kind) ? o.trimRef.current : undefined,
             echoFrames,
             font: o.fontFaces.current[o.config.font]?.worker,
           },

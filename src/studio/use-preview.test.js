@@ -2,11 +2,12 @@ import { act, renderHook } from "@testing-library/react";
 import { usePreview } from "./use-preview";
 import { defaults } from "./model";
 
+const rendered = vi.hoisted(() => vi.fn());
 vi.mock("./render-service", () => ({
   RenderService: class {
     invalidate() {}
     dispose() {}
-    async render() { return { elapsed: 5, backend: "compatibility" }; }
+    async render(...args) { rendered(...args); return { elapsed: 5, backend: "compatibility" }; }
   },
 }));
 vi.mock("./echo-sampler", () => ({
@@ -66,4 +67,19 @@ test("a blocked loop restart restores the paused controls and reports the proble
   await act(async () => { await tick(1000); });
   expect(o.setPlaying).toHaveBeenCalledWith(false);
   expect(o.alert).toHaveBeenCalledWith("Video could not resume: Playback interrupted", true);
+});
+
+test("paused animation is redrawn when trim changes and uses source time", async () => {
+  const o = options({ playing: false });
+  o.source.element.currentTime = 3;
+  o.trimRef.current = [2, 6];
+  const hook = renderHook(() => usePreview(o));
+  await act(async () => { await tick(1000); });
+  expect(rendered.mock.lastCall[5]).toMatchObject({ time: 3, motionRange: [2, 6] });
+  const count = rendered.mock.calls.length;
+  o.trimRef.current = [2, 8];
+  hook.rerender();
+  await act(async () => { await tick(1300); });
+  expect(rendered.mock.calls.length).toBeGreaterThan(count);
+  expect(rendered.mock.lastCall[5].motionRange).toEqual([2, 8]);
 });

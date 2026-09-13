@@ -32,6 +32,8 @@ import { Dialog } from "./studio/Dialog";
 import { StyleBrowser } from "./studio/StyleBrowser";
 import { Timeline } from "./studio/Timeline";
 import { ProjectDownload } from "./studio/ProjectDownload";
+import { ExportProgress } from "./studio/ExportProgress";
+import { MotionControls } from "./studio/MotionControls";
 import { ExportFormat } from "./studio/ExportFormat";
 import { CropEditor } from "./studio/CropEditor";
 import { FrameControls } from "./studio/FrameControls";
@@ -66,7 +68,7 @@ import {
   AdjustmentContext,
 } from "./studio/Controls";
 import { historyReducer } from "./studio/editor-state";
-const workspaceTabs = [["presets", "Looks", "looks"], ["artistic", "Artistic", "spark"], ["effects", "Effect", "effect"], ["color", "Color", "color"], ["mask", "Select", "select"], ["frame", "Frame", "frame"]];
+const workspaceTabs = [["presets", "Looks", "looks"], ["artistic", "Artistic", "spark"], ["effects", "Effect", "effect"], ["motion", "Motion", "play"], ["color", "Color", "color"], ["mask", "Select", "select"], ["frame", "Frame", "frame"]];
 function initialHistory() {
   const saved = readStorage("dither.config.v2", null);
   let c = saved
@@ -156,6 +158,7 @@ function App() {
     [dialog, setDialog] = useState(null),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(0),
+    [exportPhase, setExportPhase] = useState("preparing"),
     [result, setResult] = useState(null),
     [exportPlan, setExportPlan] = useState(null),
     resultCleanup = useRef();
@@ -854,6 +857,7 @@ function App() {
     abortRef.current = controller;
     setBusy(true);
     setProgress(0);
+    setExportPhase("preparing");
     setNotice(null);
     if (source.kind === "video") source.element.pause();
     setPlaying(false);
@@ -878,7 +882,8 @@ function App() {
         end: trim[1],
         fps,
         signal: controller.signal,
-        onProgress: setProgress,
+        onProgress: value => { setProgress(value); if (!usePrecise || format === "gif") setExportPhase("rendering"); },
+        onStatus: setExportPhase,
         font: fontFaces.current[c.font]?.worker,
       };
       let output;
@@ -1220,7 +1225,7 @@ function App() {
         <aside className="inspector" aria-label="Editing controls">
           <div className="panel-resize" role="separator" aria-label="Inspector width" aria-orientation="vertical" aria-valuemin={300} aria-valuemax={420} aria-valuenow={panelWidth} tabIndex={compact || tray === "canvas" ? -1 : 0} {...resizePanel} />
           <div className="tray-heading">
-            <span>{tab === "effects" ? "Effect" : tab === "presets" ? "Looks" : tab === "artistic" ? "Artistic" : tab === "mask" ? "Selection" : tab === "frame" ? "Frame" : "Color & finish"}</span>
+            <span>{tab === "effects" ? "Effect" : tab === "presets" ? "Looks" : tab === "artistic" ? "Artistic" : tab === "mask" ? "Selection" : tab === "frame" ? "Frame" : tab === "motion" ? "Motion" : "Color & finish"}</span>
             <div>
               <button className="small tray-expand" aria-label={tray === "detail" ? "Compact controls" : "Expand controls"} onClick={() => setTray(tray === "detail" ? "edit" : "detail")}><Icon name={tray === "detail" ? "collapse" : "expand"} /><span>{tray === "detail" ? "Less" : "More"}</span></button>
               <button className="icon-button" aria-label="Show canvas" onClick={() => setTray("canvas")}><Icon name="close" /></button>
@@ -1251,6 +1256,7 @@ function App() {
             hidden={tray === "canvas"}
           >
             <fieldset className="control-fieldset" disabled={busy || loading}>
+              {["effects", "color"].includes(tab) && config.motion.enabled && ["video", "demo"].includes(source.kind) && Object.keys(config.motion.tracks).length > 0 && <button className="motion-active" onClick={() => selectTab("motion")}><Icon name="play" />Animation active · Edit motion</button>}
               {tab === "effects" && (
                 <EffectControls
                   config={config}
@@ -1259,6 +1265,7 @@ function App() {
                   onFontUpload={uploadFont}
                 />
               )}
+              {tab === "motion" && <MotionControls config={config} set={set} source={source} trim={trim} time={time} seekTo={scrub} />}
               {tab === "color" && (
                 <ColorControls
                   config={config}
@@ -1693,22 +1700,7 @@ function App() {
                 Create {["png", "svg"].includes(format) ? "frame" : "export"}
               </button>
             </fieldset>
-            {busy && (
-              <div className="export-progress" role="status">
-                <div>
-                  <span>
-                    {format === "gif"
-                      ? "Rendering GIF…"
-                      : "Creating your export…"}
-                  </span>
-                  <span className="mono">{Math.round(progress * 100)}%</span>
-                </div>
-                <progress value={progress} max="1" />
-                <button onClick={() => abortRef.current?.abort()}>
-                  Cancel export
-                </button>
-              </div>
-            )}
+            {busy && <ExportProgress progress={progress} phase={exportPhase} format={format} onCancel={() => abortRef.current?.abort()} />}
             {notice && (
               <p
                 className={notice.error ? "inline-error" : "hint"}
