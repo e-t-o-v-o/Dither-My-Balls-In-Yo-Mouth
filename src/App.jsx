@@ -36,7 +36,6 @@ import { ExportProgress } from "./studio/ExportProgress";
 import { EffectStack } from "./studio/EffectStack";
 import { activeLayers, layerConfig } from "./studio/stack";
 import { ExportResult } from "./studio/ExportResult";
-import { MotionControls } from "./studio/MotionControls";
 import { ExportFormat } from "./studio/ExportFormat";
 import { CropEditor } from "./studio/CropEditor";
 import { FrameControls } from "./studio/FrameControls";
@@ -63,14 +62,13 @@ import {
 } from "./studio/export";
 import {
   Icon,
-  ColorControls,
   MaskControls,
   Select,
   Check,
   AdjustmentContext,
 } from "./studio/Controls";
 import { historyReducer } from "./studio/editor-state";
-const workspaceTabs = [["presets", "Looks", "looks"], ["artistic", "Artistic", "spark"], ["effects", "Effect", "effect"], ["motion", "Motion", "play"], ["color", "Color", "color"], ["mask", "Select", "select"], ["frame", "Frame", "frame"]];
+const workspaceTabs = [["presets", "Looks", "looks"], ["artistic", "Artistic", "spark"], ["effects", "Effect", "effect"], ["color", "Color", "color"], ["motion", "Motion", "play"], ["mask", "Select", "select"], ["frame", "Frame", "frame"]];
 function initialHistory() {
   const saved = readStorage("dither.config.v2", null);
   let c = saved
@@ -1027,7 +1025,7 @@ function App() {
           config: applyStyle(look.config, config, keepMask),
         });
         setSelectedPreset("");
-        setStackView(current => ({ ...current, editing: "main", section: "effect" }));
+        setStackView(current => ({ ...current, editing: "main" }));
         selectTab("effects");
       }}
       onPause={() => {
@@ -1234,12 +1232,12 @@ function App() {
               <button className="icon-button" aria-label="Show canvas" onClick={() => setTray("canvas")}><Icon name="close" /></button>
             </div>
           </div>
-          <div className="inspector-tabs" role="tablist" aria-label="Editing tools">
-            {workspaceTabs.map(([id, label, icon]) => (
-              <button key={id} id={`tab-${id}`} role="tab" aria-label={id === "mask" && config.maskMode !== "none" ? "Select, active" : label}
+          <div className="inspector-tabs" data-browsing={["presets", "artistic"].includes(tab)} role="tablist" aria-label="Editing tools">
+            {workspaceTabs.filter(([id]) => !compact || ["presets", "artistic"].includes(id) === ["presets", "artistic"].includes(tab)).map(([id, label, icon]) => (
+              <button key={id} data-family={["presets", "artistic"].includes(id) ? "browse" : "adjust"} id={`tab-${id}`} role="tab" aria-label={id === "mask" && config.maskMode !== "none" ? "Select, active" : label}
                 aria-selected={tab === id} aria-controls={`panel-${id}`} tabIndex={tab === id ? 0 : -1}
                 onKeyDown={e => {
-                  const tabs = workspaceTabs.map(([id]) => id);
+                  const tabs = workspaceTabs.filter(([id]) => !compact || ["presets", "artistic"].includes(id) === ["presets", "artistic"].includes(tab)).map(([id]) => id);
                   if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
                     e.preventDefault();
                     const next = e.key === "Home" ? tabs[0] : e.key === "End" ? tabs.at(-1) : tabs[(tabs.indexOf(tab) + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
@@ -1259,26 +1257,14 @@ function App() {
             hidden={tray === "canvas"}
           >
             <fieldset className="control-fieldset" disabled={busy || loading}>
-              {["effects", "color"].includes(tab) && config.motion.enabled && ["video", "demo"].includes(source.kind) && Object.keys(config.motion.tracks).length > 0 && <button className="motion-active" onClick={() => selectTab("motion")}><Icon name="play" />{config.stack.length > 1 ? "Main effect animation" : "Animation active"} · Edit motion</button>}
-              {tab === "effects" && (
-                <EffectStack
-                  source={source} trim={trim} time={time} seekTo={scrub}
-                  view={stackView} setView={setStackView}
-                  config={config}
-                  set={set}
-                  customFonts={customFonts}
-                  onFontUpload={uploadFont}
-                />
+              {["effects", "color", "motion"].includes(tab) && (
+                <EffectStack source={source} trim={trim} time={time} seekTo={scrub}
+                  view={stackView} setView={setStackView} section={tab === "effects" ? "effect" : tab}
+                  config={config} set={set} customFonts={customFonts} onFontUpload={uploadFont}
+                  onMotion={() => selectTab("motion")} />
               )}
-              {tab === "motion" && <MotionControls config={config} set={set} source={source} trim={trim} time={time} seekTo={scrub} />}
-              {tab === "color" && (
-                <ColorControls
-                  config={config}
-                  set={set}
-                  motion={source.kind !== "image"}
-                  echoes={["demo", "video"].includes(source.kind)}
-                />
-              )}
+              {tab === "frame" && <div className="scope-heading"><span className="eyebrow">Whole composition</span><h2>Frame & timing</h2><p>One frame for every layer.</p></div>}
+              {tab === "mask" && <div className="scope-heading"><span className="eyebrow">Main effect only</span><h2>Selection</h2><p>Choose where the main treatment appears.</p><button className="small" onClick={() => { setStackView(current => ({ ...current, editing: "main" })); selectTab("effects"); }}>Edit main effect <Icon name="chevron" /></button></div>}
               {tab === "frame" && (
                 <FrameControls
                   config={config}
@@ -1422,6 +1408,12 @@ function App() {
           </div>
         </aside>
       </main>
+      {compact && <nav className="touch-dock" aria-label="Workspace activities">
+        <button aria-pressed={tray === "canvas"} onClick={() => setTray(tray === "canvas" ? "edit" : "canvas")}><Icon name="panel" /><span>Preview</span></button>
+        <button aria-pressed={tray !== "canvas" && ["presets", "artistic"].includes(tab)} onClick={() => { selectTab("artistic"); setTray("detail"); }}><Icon name="looks" /><span>Browse</span></button>
+        <button aria-pressed={tray !== "canvas" && !["presets", "artistic"].includes(tab)} onClick={() => { if (["presets", "artistic"].includes(tab)) selectTab("effects"); setTray("edit"); }}><Icon name="effect" /><span>Adjust</span></button>
+        <button onClick={showExport} disabled={loading || busy} aria-label="Open export"><Icon name="download" /><span>Export</span></button>
+      </nav>}
       {dragging && (
         <div className="drop-overlay">
           <Icon name="upload" />

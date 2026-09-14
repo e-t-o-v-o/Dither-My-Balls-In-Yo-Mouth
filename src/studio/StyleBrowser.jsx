@@ -5,6 +5,8 @@ import { RenderService } from "./render-service";
 import { EchoSampler } from "./echo-sampler";
 import { applyStyle } from "./workflow";
 import { frameDimensions } from "./framing";
+import { Dialog } from "./Dialog";
+import { Icon } from "./Controls";
 const thumbnail = (look) =>
   `${import.meta.env.BASE_URL}styles/${look.name.toLowerCase().replace(/\s+/g, "-")}.png`;
 export function StyleBrowser({
@@ -22,6 +24,13 @@ export function StyleBrowser({
   onTechniqueChange,
 }) {
   const searchId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const galleryButton = useRef();
+  const wasExpanded = useRef(false);
+  useEffect(() => {
+    if (wasExpanded.current && !expanded) galleryButton.current?.focus();
+    wasExpanded.current = expanded;
+  }, [expanded]);
   const [previews, setPreviews] = useState({}),
     [rendering, setRendering] = useState(false),
     [query, setQuery] = useState(""),
@@ -69,7 +78,7 @@ export function StyleBrowser({
       for (const look of visibleLooks) {
         if (abort.signal.aborted) break;
         const c = applyStyle(look.config, config, keepMask);
-        const size = frameDimensions(source, c, "240");
+        const size = frameDimensions(source, c, expanded ? "480" : "320");
         service.invalidate();
         const echoFrames = await echoes.frames(time, c, abort.signal);
         await service.render(snapshot, output, c, size.width, size.height, {
@@ -96,13 +105,14 @@ export function StyleBrowser({
     <button
       key={look.name}
       className="look"
+      aria-label={`${look.name} ${look.note}`}
       disabled={busy}
       onClick={() => {
         onApply(look);
         close();
       }}
     >
-      <img
+      <span className="look-artwork"><img
         className="style-preview"
         src={previews[look.name] || thumbnail(look)}
         alt=""
@@ -110,34 +120,39 @@ export function StyleBrowser({
         width="240"
         height="144"
       />
+      <span className="look-preview-label">{previews[look.name] ? "Your frame" : "Sample"}</span></span>
       <strong>{look.name}</strong>
-      <span>{look.note}</span>
+      <span className="look-caption">{look.note.split("/").at(-1).trim()}</span>
     </button>
   );
-  return (
-    <section className="looks-section">
-      <div className="section-heading"><h2>{artistic ? "Artistic collection" : "Studio looks"}</h2><span>{visibleLooks.length} styles</span></div>
-      <p className="hint">{artistic ? "Ink, thread, paper, glass. A collection of distinct techniques to make your own." : "Classic digital treatments and saved starting points."}</p>
-      <div className="control style-search"><label htmlFor={searchId}>Find a look</label>
+  const content = <>
+      <div className="gallery-heading"><div><span className="eyebrow">{artistic ? "Materials & patterns" : "Digital & print"}</span><h2>{artistic ? "Artistic collection" : "Studio looks"}</h2></div>
+        {!expanded && <button ref={galleryButton} className="icon-button" aria-label={artistic ? "Open artistic gallery" : "Open looks gallery"} onClick={() => { onPause(); setExpanded(true); }}><Icon name="gallery" /></button>}
+      </div>
+      <div className="gallery-filters">
+      <div className="control style-search"><label className="sr-only" htmlFor={searchId}>Find a look</label>
         <span className="style-search-field">
           <input id={searchId} type="search" value={query} placeholder={artistic ? "Try marbling, silk, contours…" : "Search studio looks…"} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === "Escape") { setQuery(""); e.stopPropagation(); } }} disabled={busy} />
           {query && <button type="button" className="style-search-clear" aria-label="Clear look search" onClick={() => setQuery("")} disabled={busy}>×</button>}
         </span>
       </div>
-      {artistic && <label className="control">Technique
+      {artistic && <label className="control technique-filter"><span className="sr-only">Technique</span>
         <select value={technique} onChange={e => onTechniqueChange(e.target.value)} disabled={busy}>
           <option value="all">All techniques</option>
           {effects.filter(([id]) => artisticEffects.includes(id)).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
       </label>}
+      </div>
       {config.maskMode !== "none" && <label className="check style-options"><input type="checkbox" checked={keepMask} onChange={e => setKeepMask(e.target.checked)} disabled={busy} /><span>Keep selection when changing looks</span></label>}
-      {config.stack.length > 1 && <p className="hint">Looks replace the main effect. Frame previews include your added layers.</p>}
-      <button className="full style-preview-button" onClick={rendering ? close : preview} disabled={busy || !visibleLooks.length}>
-        {rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview looks on this frame"}
-      </button>
+      {config.stack.length > 1 && <p className="hint gallery-scope">Replaces the main effect · Keeps your added layers</p>}
+      <div className="gallery-toolbar"><span>{visibleLooks.length} styles</span><button className="small style-preview-button" aria-label={rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview looks on this frame"} onClick={rendering ? close : preview} disabled={busy || !visibleLooks.length}>
+        {rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview your frame"}
+      </button></div>
       {error && <p className="inline-error">{error}</p>}
       {!visibleLooks.length && <div className="style-empty" role="status"><strong>No matching looks</strong><p className="hint">Try a different word or technique.</p><button className="full" onClick={() => { setQuery(""); if (artistic) onTechniqueChange("all"); }}>Show all looks</button></div>}
       <div className="style-library-grid">{visibleLooks.map(card)}</div>
-    </section>
-  );
+    </>;
+  return expanded
+    ? <Dialog title={artistic ? "Artistic gallery" : "Looks gallery"} onClose={() => setExpanded(false)}><div className="modal-body looks-section looks-gallery">{content}</div></Dialog>
+    : <section className="looks-section">{content}</section>;
 }

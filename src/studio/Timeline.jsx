@@ -30,9 +30,10 @@ export function Timeline({ source, time, trim, busy, loading, playing, loop,
         <button className="quiet trim-button" onClick={openTrim} disabled={busy || loading}>{camera ? "Length" : "Trim"}<Icon name="chevron" /></button>
       </div>
     </div>
+    {!camera && <div className="timeline-scale" aria-label="Timeline range"><span>{timeLabel(0)}</span><span className="timeline-selection">{(trim[1] - trim[0]).toFixed(2)} s selected</span><span>{timeLabel(source.duration)}</span></div>}
     {!camera && <div className="scrubber">
       <Filmstrip source={source} trim={trim} changeTrim={changeTrim} disabled={busy} interactive={false} />
-      <input className="playhead" aria-label="Video playhead" type="range" min="0" max={source.duration || 1} step="0.01" value={Math.min(time, source.duration || 1)} disabled={busy || loading} onChange={e => scrub(Number(e.target.value))} />
+      <input className="playhead" aria-label="Video playhead" aria-valuetext={`${timeLabel(time)} of ${timeLabel(source.duration)}`} type="range" min="0" max={source.duration || 1} step="0.01" value={Math.min(time, source.duration || 1)} disabled={busy || loading} onChange={e => scrub(Number(e.target.value))} />
     </div>}
     {trimming && <Dialog title={camera ? "Recording length" : "Trim & timing"} onClose={() => setTrimming(false)}>
       <div className="modal-body trim-editor">
