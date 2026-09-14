@@ -438,6 +438,7 @@ test("motion endpoints are editable, seekable, reversible, and passed to exports
 
 test("effect stacks add, reorder, bypass, edit independently, and undo without losing layers", () => {
   render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Manage effect layers" }));
   fireEvent.change(screen.getByRole("combobox", { name: "Add effect", exact: true }), { target: { value: "marbling" } });
   expect(screen.getByRole("button", { name: "Change effect", exact: true })).toHaveTextContent("Marbled ink");
   fireEvent.change(screen.getByRole("combobox", { name: "Add effect", exact: true }), { target: { value: "screenprint" } });
@@ -448,13 +449,14 @@ test("effect stacks add, reorder, bypass, edit independently, and undo without l
   expect(screen.getByText(/This effect is bypassed/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
   expect(screen.getByRole("checkbox", { name: "Enable Screenprint layer 2" })).toBeChecked();
-  fireEvent.click(within(screen.getByRole("group", { name: "Layer controls" })).getByRole("button", { name: "Color", exact: true }));
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
   fireEvent.click(screen.getByRole("tab", { name: "Frame", exact: true }));
   fireEvent.click(screen.getByRole("tab", { name: "Effect", exact: true }));
   expect(screen.getByRole("button", { name: "Edit Screenprint layer 2" })).toHaveAttribute("aria-pressed", "true");
-  expect(within(screen.getByRole("group", { name: "Layer controls" })).getByRole("button", { name: "Color", exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Change effect", exact: true })).toHaveTextContent("Screenprint");
   fireEvent.click(screen.getByRole("button", { name: "Edit Dither layer 1" }));
   expect(screen.getByRole("button", { name: "Change effect", exact: true })).toHaveTextContent("Dither");
+  fireEvent.click(screen.getByRole("button", { name: "Edit Marbled ink layer 3" }));
   fireEvent.click(screen.getByRole("button", { name: "Remove Marbled ink layer 3" }));
   expect(screen.getByRole("combobox", { name: "Add effect", exact: true })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Edit Screenprint layer 2" }));
@@ -462,4 +464,59 @@ test("effect stacks add, reorder, bypass, edit independently, and undo without l
   fireEvent.click(screen.getByRole("button", { name: /Wayfinding/ }));
   expect(screen.getByRole("button", { name: "Change effect", exact: true })).toHaveTextContent("Symbol field");
   expect(screen.getByRole("button", { name: "Edit Screenprint layer 2" })).toHaveAttribute("aria-pressed", "false");
+});
+
+test("Color and Motion follow the selected layer without changing the main effect", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Manage effect layers" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Add effect", exact: true }), { target: { value: "marbling" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  fireEvent.change(screen.getByRole("slider", { name: "Saturation", exact: true }), { target: { value: "0.35" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Motion", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Start with an effect reveal" }));
+  expect(screen.getByRole("checkbox", { name: "Animate effects" })).toBeChecked();
+  fireEvent.click(screen.getByRole("button", { name: "Edit Dither layer 1" }));
+  expect(screen.getByRole("checkbox", { name: "Animate effects" })).not.toBeChecked();
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  expect(screen.getByRole("slider", { name: "Saturation", exact: true })).toHaveValue("1");
+  fireEvent.click(screen.getByRole("button", { name: "Edit Marbled ink layer 2" }));
+  expect(screen.getByRole("slider", { name: "Saturation", exact: true })).toHaveValue("0.35");
+  fireEvent.click(screen.getByRole("tab", { name: "Motion", exact: true }));
+  expect(screen.getByRole("checkbox", { name: "Animate effects" })).toBeChecked();
+});
+
+test("expanded artistic gallery preserves filtering and restores keyboard focus", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic", exact: true }));
+  fireEvent.change(screen.getByRole("searchbox", { name: "Find a look" }), { target: { value: "Wayfinding" } });
+  fireEvent.click(screen.getByRole("button", { name: "Open artistic gallery" }));
+  const gallery = screen.getByRole("dialog", { name: "Artistic gallery" });
+  expect(within(gallery).getByRole("searchbox")).toHaveValue("Wayfinding");
+  expect(within(gallery).getAllByRole("button", { name: /Wayfinding/ })).toHaveLength(1);
+  fireEvent.click(within(gallery).getByRole("button", { name: "Close dialog" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Open artistic gallery" })).toHaveFocus();
+  expect(screen.getByRole("searchbox")).toHaveValue("Wayfinding");
+  fireEvent.click(screen.getByRole("button", { name: "Open artistic gallery" }));
+  fireEvent.click(screen.getByRole("button", { name: /Wayfinding/ }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Change effect" })).toHaveTextContent("Symbol field");
+});
+
+test("compact activities keep editing and browsing navigation separate and keyboard reachable", () => {
+  vi.stubGlobal("matchMedia", vi.fn(query => ({ matches: query.includes("max-width: 1049px"), addEventListener() {}, removeEventListener() {} })));
+  render(<App />);
+  const activities = screen.getByRole("navigation", { name: "Workspace activities" });
+  expect(screen.getAllByRole("tab")).toHaveLength(5);
+  fireEvent.click(within(activities).getByRole("button", { name: "Browse" }));
+  expect(screen.getAllByRole("tab")).toHaveLength(2);
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Artistic" }), { key: "ArrowRight" });
+  expect(screen.getByRole("tab", { name: "Looks" })).toHaveFocus();
+  fireEvent.click(within(activities).getByRole("button", { name: "Adjust" }));
+  expect(screen.getByRole("tab", { name: "Effect" })).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(within(activities).getByRole("button", { name: "Preview" }));
+  expect(document.querySelector(".workspace")).toHaveAttribute("data-tray", "canvas");
+  expect(screen.getByRole("button", { name: "Play", exact: true })).toBeEnabled();
+  fireEvent.click(within(activities).getByRole("button", { name: "Open export" }));
+  expect(screen.getByRole("dialog", { name: /Export/ })).toBeInTheDocument();
 });
