@@ -39,7 +39,11 @@ test("MP4 is a visible choice, reaches the encoder explicitly, and is remembered
   fireEvent.click(screen.getByRole("radio", { name: "MP4", exact: true }));
   expect(screen.getByRole("radio", { name: "MP4", exact: true })).toBeChecked();
   await waitFor(() => expect(screen.getByRole("button", { name: "Create export" })).toBeEnabled());
+  const exportDialog = screen.getByRole("dialog", { name: "Export", exact: true });
+  exportDialog.scrollTop = 400;
   fireEvent.click(screen.getByRole("button", { name: "Create export" }));
+  expect(await screen.findByRole("region", { name: "Export ready" })).toHaveFocus();
+  expect(exportDialog.scrollTop).toBe(0);
   expect(await screen.findByRole("link", { name: "Download MP4" })).toHaveAttribute("download", expect.stringMatching(/\.mp4$/));
   expect(encode.mock.calls[0][0].format).toBe("mp4");
   first.unmount();
@@ -519,4 +523,96 @@ test("compact activities keep editing and browsing navigation separate and keybo
   expect(screen.getByRole("button", { name: "Play", exact: true })).toBeEnabled();
   fireEvent.click(within(activities).getByRole("button", { name: "Open export" }));
   expect(screen.getByRole("dialog", { name: /Export/ })).toBeInTheDocument();
+});
+
+test("compact navigation returns to the last editing tab, browse collection, and panel size", () => {
+  vi.stubGlobal("matchMedia", vi.fn(query => ({ matches: query.includes("max-width: 1049px"), addEventListener() {}, removeEventListener() {} })));
+  render(<App />);
+  const dock = within(screen.getByRole("navigation", { name: "Workspace activities" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Expand controls" }));
+  fireEvent.click(dock.getByRole("button", { name: "Browse" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Looks", exact: true }));
+  fireEvent.change(screen.getByRole("searchbox", { name: "Find a look" }), { target: { value: "dither" } });
+  fireEvent.click(dock.getByRole("button", { name: "Adjust" }));
+  expect(screen.getByRole("tab", { name: "Color", exact: true })).toHaveAttribute("aria-selected", "true");
+  expect(document.querySelector(".workspace")).toHaveAttribute("data-tray", "detail");
+  fireEvent.click(dock.getByRole("button", { name: "Preview" }));
+  fireEvent.click(dock.getByRole("button", { name: "Preview" }));
+  expect(document.querySelector(".workspace")).toHaveAttribute("data-tray", "detail");
+  fireEvent.click(dock.getByRole("button", { name: "Browse" }));
+  expect(screen.getByRole("tab", { name: "Looks", exact: true })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("searchbox", { name: "Find a look" })).toHaveValue("dither");
+});
+
+test("each collection keeps its search when trying looks and returns focus to editing", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic", exact: true }));
+  fireEvent.change(screen.getByRole("searchbox", { name: "Find a look" }), { target: { value: "Wayfinding" } });
+  fireEvent.click(screen.getByRole("button", { name: /Wayfinding/ }));
+  expect(screen.getByRole("tab", { name: "Effect", exact: true })).toHaveFocus();
+  fireEvent.click(screen.getByRole("tab", { name: "Looks", exact: true }));
+  expect(screen.getByRole("searchbox", { name: "Find a look" })).toHaveValue("");
+  fireEvent.change(screen.getByRole("searchbox", { name: "Find a look" }), { target: { value: "pixel" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic", exact: true }));
+  expect(screen.getByRole("searchbox", { name: "Find a look" })).toHaveValue("Wayfinding");
+  fireEvent.click(screen.getByRole("tab", { name: "Looks", exact: true }));
+  expect(screen.getByRole("searchbox", { name: "Find a look" })).toHaveValue("pixel");
+});
+
+test("scroll position is remembered separately for tabs and selected layers", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Manage effect layers" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Add effect", exact: true }), { target: { value: "screenprint" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  const panel = screen.getByRole("tabpanel", { name: "Color", exact: true });
+  fireEvent.scroll(panel, { target: { scrollTop: 360 } });
+  fireEvent.click(screen.getByRole("tab", { name: "Frame", exact: true }));
+  expect(panel.scrollTop).toBe(0);
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  expect(panel.scrollTop).toBe(360);
+  fireEvent.click(screen.getByRole("button", { name: "Edit Dither layer 1" }));
+  expect(panel.scrollTop).toBe(0);
+  fireEvent.scroll(panel, { target: { scrollTop: 120 } });
+  fireEvent.click(screen.getByRole("button", { name: "Edit Screenprint layer 2" }));
+  expect(panel.scrollTop).toBe(360);
+  fireEvent.click(screen.getByRole("button", { name: "Focus on canvas" }));
+  fireEvent.scroll(panel, { target: { scrollTop: 0 } });
+  fireEvent.click(screen.getByRole("button", { name: "Show editing controls" }));
+  expect(panel.scrollTop).toBe(360);
+});
+
+test("motion remembers each layer's endpoint across tabs without seeking on return", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Manage effect layers" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Add effect", exact: true }), { target: { value: "screenprint" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Motion", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Start with an effect reveal" }));
+  fireEvent.click(screen.getByRole("button", { name: /End 00:08/ }));
+  fireEvent.change(screen.getByRole("slider", { name: "Video playhead" }), { target: { value: "3" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  fireEvent.click(screen.getByRole("tab", { name: "Motion", exact: true }));
+  expect(screen.getByRole("button", { name: /End 00:08/ })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("slider", { name: "Video playhead" })).toHaveValue("3");
+  fireEvent.click(screen.getByRole("button", { name: "Edit Dither layer 1" }));
+  expect(screen.getByRole("button", { name: /Start 00:00/ })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Edit Screenprint layer 2" }));
+  expect(screen.getByRole("button", { name: /End 00:08/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("finishing a phone selection returns to the expanded selection controls", () => {
+  vi.stubGlobal("matchMedia", vi.fn(query => ({ matches: query.includes("max-width: 1049px"), addEventListener() {}, removeEventListener() {} })));
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Select", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Expand controls" }));
+  fireEvent.click(screen.getByRole("button", { name: "Brush", exact: true }));
+  expect(document.querySelector(".workspace")).toHaveAttribute("data-tray", "canvas");
+  fireEvent.click(screen.getByRole("button", { name: "Done", exact: true }));
+  expect(document.querySelector(".workspace")).toHaveAttribute("data-tray", "detail");
+  expect(screen.getByRole("button", { name: "Brush", exact: true })).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByRole("tab", { name: /Select/ })).toHaveFocus();
+  fireEvent.click(screen.getByRole("button", { name: "Brush", exact: true }));
+  fireEvent.click(within(screen.getByRole("navigation", { name: "Workspace activities" })).getByRole("button", { name: "Adjust", exact: true }));
+  expect(screen.queryByText("Paint selection")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Brush", exact: true })).toHaveAttribute("aria-pressed", "false");
 });

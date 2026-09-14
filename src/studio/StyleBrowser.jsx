@@ -22,6 +22,8 @@ export function StyleBrowser({
   collection = "studio",
   technique = "all",
   onTechniqueChange,
+  query = "",
+  onQueryChange: setQuery,
 }) {
   const searchId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -33,7 +35,6 @@ export function StyleBrowser({
   }, [expanded]);
   const [previews, setPreviews] = useState({}),
     [rendering, setRendering] = useState(false),
-    [query, setQuery] = useState(""),
     [error, setError] = useState("");
   const artistic = collection === "artistic";
   const collectionLooks = looks.filter(look => artisticEffects.includes(look.config.effect) === artistic);
@@ -48,7 +49,6 @@ export function StyleBrowser({
     setRendering(false);
     setError("");
   }, [config, source, keepMask, collection, technique, query, time, trim]);
-  useEffect(() => setQuery(""), [collection]);
   const close = () => {
     controller.current?.abort();
   };

@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import { Check, Range, Select } from "./Controls";
 import { availableMotionControls, configAtTime } from "./motion";
 import { timeLabel } from "./model";
 
-export function MotionControls({ config, set, source, trim, time, seekTo }) {
-  const [endpoint, setEndpoint] = useState(0);
+export function MotionControls({ config, set, source, trim, time, seekTo, endpoint = 0, setEndpoint }) {
   const motion = config.motion;
   const controls = availableMotionControls(config.effect);
   const active = controls.filter(([key]) => motion.tracks[key]);
