@@ -1,8 +1,17 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Icon } from "./Controls";
 import { ExportReview } from "./ExportReview";
 
 export function ExportResult({ result, current, onNotice }) {
+  const container = useRef();
+  useEffect(() => {
+    const element = container.current;
+    const dialog = element?.closest("dialog");
+    if (dialog?.open) {
+      dialog.scrollTop = 0;
+      element.focus({ preventScroll: true });
+    }
+  }, [result.url]);
   const share = async () => {
     try {
       const file = new File([result.blob], result.name, { type: result.blob.type });
@@ -16,7 +25,7 @@ export function ExportResult({ result, current, onNotice }) {
     }
   };
   return (
-    <div className="export-result">
+    <div ref={container} className="export-result" role="region" aria-label={current ? "Export ready" : "Previous export"} tabIndex={-1}>
       <span className="eyebrow">{current ? "READY TO SAVE" : "PREVIOUS EXPORT"}</span>
       <strong>{result.name}</strong>
       <span>{result.effectName} · {result.selection}</span>

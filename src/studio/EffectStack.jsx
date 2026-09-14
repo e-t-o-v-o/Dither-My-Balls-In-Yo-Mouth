@@ -59,6 +59,6 @@ export function EffectStack({ config, set, source, trim, time, seekTo, customFon
     </section>
     {section === "effect" ? <EffectControls key={selected.id} config={c} set={edit} customFonts={main ? customFonts : []} onFontUpload={main ? onFontUpload : undefined} />
       : section === "color" ? <ColorControls key={selected.id} config={c} set={edit} motion={source.kind !== "image"} echoes={main && ["demo", "video"].includes(source.kind)} echoControls={main} />
-      : <MotionControls key={selected.id} config={c} set={edit} source={source} trim={trim} time={time} seekTo={seekTo} />}
+      : <MotionControls key={selected.id} config={c} set={edit} source={source} trim={trim} time={time} seekTo={seekTo} endpoint={view.endpoints?.[selected.id] || 0} setEndpoint={endpoint => setView(current => ({ ...current, endpoints: { ...current.endpoints, [selected.id]: endpoint } }))} />}
   </>;
 }

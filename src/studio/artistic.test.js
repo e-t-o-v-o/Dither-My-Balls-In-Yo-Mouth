@@ -106,19 +106,21 @@ test("artistic imports reject invalid structures and bound expensive detail sett
     .toMatchObject({ effect: "arc-tiles", cellSize: 16, artSeed: 13, arcBands: 4, arcWeight: 0.1, artColorMode: "palette", paperShape: "leaves", glassGap: 0.2 });
 });
 
-test.each(materialArtEffects)("%s bounds opacity at maximum detail, with repeatable landscape and portrait compositions", effect => {
-  for (const [width, height] of [[360, 240], [240, 360]]) for (const artSeed of [0, 43, 99]) {
-    const input = createCanvas(width, height), output = createCanvas(width, height), ctx = input.getContext("2d");
-    ctx.fillStyle = "rgba(185,130,60,0.5)"; ctx.fillRect(0, 0, width, height);
-    const c = sanitizeConfig({ ...defaults, effect, transparent: true, cellSize: 12, artColorMode: "source", artSeed,
-      marbleSwirl: 1, marbleWeight: 1, topoLevels: 16, topoContour: 0.04, stitchLength: 1, stitchWidth: 1, stitchStrands: 3 });
-    new FrameRenderer().render(input, output, c, width, height);
-    const a = pixels(output);
-    let max = 0;
-    for (let i = 3; i < a.length; i += 4) max = Math.max(max, a[i]);
-    expect(max).toBeGreaterThan(32); // Fine filaments can be narrower than a pixel.
-    expect(max).toBeLessThanOrEqual(130);
-  }
+// Each maximum-detail fixture is its own test, so the default timeout covers
+// one render instead of six competing with other suites on shared CI runners.
+const detailCases = materialArtEffects.flatMap(effect => [[360, 240], [240, 360]].flatMap(([width, height]) =>
+  [0, 43, 99].map(artSeed => ({ effect, width, height, artSeed }))));
+test.each(detailCases)("$effect bounds opacity at maximum detail: $width × $height, seed $artSeed", ({ effect, width, height, artSeed }) => {
+  const input = createCanvas(width, height), output = createCanvas(width, height), ctx = input.getContext("2d");
+  ctx.fillStyle = "rgba(185,130,60,0.5)"; ctx.fillRect(0, 0, width, height);
+  const c = sanitizeConfig({ ...defaults, effect, transparent: true, cellSize: 12, artColorMode: "source", artSeed,
+    marbleSwirl: 1, marbleWeight: 1, topoLevels: 16, topoContour: 0.04, stitchLength: 1, stitchWidth: 1, stitchStrands: 3 });
+  new FrameRenderer().render(input, output, c, width, height);
+  const a = pixels(output);
+  let max = 0;
+  for (let i = 3; i < a.length; i += 4) max = Math.max(max, a[i]);
+  expect(max).toBeGreaterThan(32); // Fine filaments can be narrower than a pixel.
+  expect(max).toBeLessThanOrEqual(130);
 });
 
 test("contour terraces preserve white plateaus at the top of the tone range", () => {

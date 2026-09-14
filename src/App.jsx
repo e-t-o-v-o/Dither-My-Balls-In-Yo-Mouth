@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import "./App.css";
+import { useInspector, isBrowsing } from "./studio/use-inspector";
 import {
   defaults,
   sanitizeConfig,
@@ -141,9 +142,11 @@ function App() {
   const [artTechnique, setArtTechnique] = useState("all");
   const [stackView, setStackView] = useState({});
   const [exportSettingsOpen, setExportSettingsOpen] = useState(true);
-  const inspectorScroll = useRef();
-  const [tab, setTab] = useState("effects"),
-    [keepMask, setKeepMask] = useState(false),
+  const [lookQueries, setLookQueries] = useState({ studio: "", artistic: "" });
+  const selectedLayer = config.stack.find(layer => layer.id === stackView.editing) || { id: "main" };
+  const inspector = useInspector({ tray, setTray, layerKey: `${selectedLayer.id}:${layerConfig(config, selectedLayer).effect}`, lookSection });
+  const { tab, scrollRef: inspectorScroll } = inspector;
+  const [keepMask, setKeepMask] = useState(false),
     [compare, setCompare] = useState(false),
     [split, setSplit] = useState(50),
     [previewSize, setPreviewSize] = useState("auto"),
@@ -155,7 +158,6 @@ function App() {
     [savedSession, setSavedSession] = useState(null),
     [autosaveStatus, setAutosaveStatus] = useState(""),
     projectInput = useRef();
-  useEffect(() => { if (inspectorScroll.current) inspectorScroll.current.scrollTop = 0; }, [tab]);
   const [notice, setNotice] = useState(null),
     [loading, setLoading] = useState(false),
     [resumeVideo, setResumeVideo] = useState(null),
@@ -1002,15 +1004,20 @@ function App() {
     begin: () => dispatch({ type: "begin-adjustment" }),
     end: () => dispatch({ type: "end-adjustment" }),
   }), []);
-  const selectTab = (next) => {
-    setTab(next);
+  const selectTab = (next, focus = false) => {
+    inspector.selectTab(next, focus);
     if (next !== "mask") setSelectionTool("none");
-    if (tray === "canvas") setTray("edit");
   };
+  const toggleCanvas = () => { setSelectionTool("none"); inspector.toggleCanvas(); };
+  const openActivity = kind => { setSelectionTool("none"); inspector.openActivity(kind); };
+  const collection = tab === "artistic" ? "artistic" : "studio";
+  const visibleTabs = workspaceTabs.filter(([id]) => !compact || isBrowsing(id) === isBrowsing(tab));
   const styleBrowser = (
     <StyleBrowser
       key={tab === "artistic" ? "artistic" : "studio"}
-      collection={tab === "artistic" ? "artistic" : "studio"}
+      collection={collection}
+      query={lookQueries[collection]}
+      onQueryChange={query => setLookQueries(current => ({ ...current, [collection]: query }))}
       technique={tab === "artistic" ? artTechnique : "all"}
       onTechniqueChange={setArtTechnique}
       config={config}
@@ -1026,7 +1033,7 @@ function App() {
         });
         setSelectedPreset("");
         setStackView(current => ({ ...current, editing: "main" }));
-        selectTab("effects");
+        selectTab("effects", true);
       }}
       onPause={() => {
         setPlaying(false);
@@ -1071,7 +1078,7 @@ function App() {
             <button className="icon-button" title="Undo (⌘/Ctrl Z)" aria-label="Undo" disabled={!history.past.length || busy} onClick={() => dispatch({ type: "undo" })}><Icon name="undo" /></button>
             <button className="icon-button" title="Redo (⌘/Ctrl Shift Z)" aria-label="Redo" disabled={!history.future.length || busy} onClick={() => dispatch({ type: "redo" })}><Icon name="redo" /></button>
           </div>
-          <button className="icon-button panel-toggle" aria-label={tray === "canvas" ? "Show editing controls" : "Focus on canvas"} title={tray === "canvas" ? "Show editing controls" : "Focus on canvas"} onClick={() => setTray(tray === "canvas" ? "edit" : "canvas")}><Icon name="panel" /></button>
+          <button className="icon-button panel-toggle" aria-label={tray === "canvas" ? "Show editing controls" : "Focus on canvas"} title={tray === "canvas" ? "Show editing controls" : "Focus on canvas"} onClick={toggleCanvas}><Icon name="panel" /></button>
           <button className="primary" onClick={showExport} disabled={loading || busy}><Icon name="download" /><span>Export</span></button>
         </div>
       </header>
@@ -1135,7 +1142,7 @@ function App() {
                 </span>
                 <button
                   className="small"
-                  onClick={() => setSelectionTool("none")}
+                  onClick={() => { setSelectionTool("none"); if (compact) inspector.restoreControls(true); }}
                 >
                   Done
                 </button>
@@ -1229,15 +1236,15 @@ function App() {
             <span>{tab === "effects" ? "Effect" : tab === "presets" ? "Looks" : tab === "artistic" ? "Artistic" : tab === "mask" ? "Selection" : tab === "frame" ? "Frame" : tab === "motion" ? "Motion" : "Color & finish"}</span>
             <div>
               <button className="small tray-expand" aria-label={tray === "detail" ? "Compact controls" : "Expand controls"} onClick={() => setTray(tray === "detail" ? "edit" : "detail")}><Icon name={tray === "detail" ? "collapse" : "expand"} /><span>{tray === "detail" ? "Less" : "More"}</span></button>
-              <button className="icon-button" aria-label="Show canvas" onClick={() => setTray("canvas")}><Icon name="close" /></button>
+              <button className="icon-button" aria-label="Show canvas" onClick={toggleCanvas}><Icon name="close" /></button>
             </div>
           </div>
           <div className="inspector-tabs" data-browsing={["presets", "artistic"].includes(tab)} role="tablist" aria-label="Editing tools">
-            {workspaceTabs.filter(([id]) => !compact || ["presets", "artistic"].includes(id) === ["presets", "artistic"].includes(tab)).map(([id, label, icon]) => (
+            {visibleTabs.map(([id, label, icon]) => (
               <button key={id} data-family={["presets", "artistic"].includes(id) ? "browse" : "adjust"} id={`tab-${id}`} role="tab" aria-label={id === "mask" && config.maskMode !== "none" ? "Select, active" : label}
                 aria-selected={tab === id} aria-controls={`panel-${id}`} tabIndex={tab === id ? 0 : -1}
                 onKeyDown={e => {
-                  const tabs = workspaceTabs.filter(([id]) => !compact || ["presets", "artistic"].includes(id) === ["presets", "artistic"].includes(tab)).map(([id]) => id);
+                  const tabs = visibleTabs.map(([id]) => id);
                   if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
                     e.preventDefault();
                     const next = e.key === "Home" ? tabs[0] : e.key === "End" ? tabs.at(-1) : tabs[(tabs.indexOf(tab) + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
@@ -1249,6 +1256,7 @@ function App() {
           <div
             className="inspector-scroll"
             ref={inspectorScroll}
+            onScroll={inspector.onScroll}
             id={`panel-${tab}`}
             role="tabpanel"
             aria-labelledby={`tab-${tab}`}
@@ -1409,9 +1417,9 @@ function App() {
         </aside>
       </main>
       {compact && <nav className="touch-dock" aria-label="Workspace activities">
-        <button aria-pressed={tray === "canvas"} onClick={() => setTray(tray === "canvas" ? "edit" : "canvas")}><Icon name="panel" /><span>Preview</span></button>
-        <button aria-pressed={tray !== "canvas" && ["presets", "artistic"].includes(tab)} onClick={() => { selectTab("artistic"); setTray("detail"); }}><Icon name="looks" /><span>Browse</span></button>
-        <button aria-pressed={tray !== "canvas" && !["presets", "artistic"].includes(tab)} onClick={() => { if (["presets", "artistic"].includes(tab)) selectTab("effects"); setTray("edit"); }}><Icon name="effect" /><span>Adjust</span></button>
+        <button aria-pressed={tray === "canvas"} onClick={toggleCanvas}><Icon name="panel" /><span>Preview</span></button>
+        <button aria-pressed={tray !== "canvas" && ["presets", "artistic"].includes(tab)} onClick={() => openActivity("browse")}><Icon name="looks" /><span>Browse</span></button>
+        <button aria-pressed={tray !== "canvas" && !["presets", "artistic"].includes(tab)} onClick={() => openActivity("adjust")}><Icon name="effect" /><span>Adjust</span></button>
         <button onClick={showExport} disabled={loading || busy} aria-label="Open export"><Icon name="download" /><span>Export</span></button>
       </nav>}
       {dragging && (
