@@ -98,7 +98,7 @@ async function bundle(entry, name) {
 }
 // Native codec callbacks do not keep Node's event loop alive on every platform.
 // Keep this check alive until completion, and fail boundedly if a codec stalls.
-// The extended artistic matrix adds eight real, 60-frame codec round trips.
+// The extended artistic matrix covers each print system and its distinct modes.
 // Keep a bounded suite deadline while allowing for the additional fixtures.
 const integrationTimeout = process.argv.includes("--artistic") ? 180_000 : 120_000;
 const watchdog = setTimeout(() => {
@@ -148,7 +148,10 @@ try {
     ["mp4", "Agate bloom"], ["webm", "Chromatic atlas"], ["mp4", "Silk study"],
     ["mp4", "Night transmission"], ["webm", "Cyan draft"], ["mp4", "Archive collage"],
     ["webm", "Chromatic type"], ["mp4", "Toner rouge"], ["mp4", "Opal interference"],
-    ["webm", "Solar impression"], ["mp4", "Chromatic orbits"]);
+    ["webm", "Solar impression"], ["mp4", "Chromatic orbits"],
+    ["mp4", "Chromatic escarpment"], ["webm", "Afterimage terrain"],
+    ["mp4", "Coral syntax"], ["webm", "Resonant silk"],
+    ["mp4", "City inlay"], ["webm", "Patchwork radio"]);
   if (process.argv.includes("--all-effects")) {
     const covered = new Set(cases.map(([, name]) => looks.find(look => look.name === name).config.effect));
     for (const [effect, name] of effects)

@@ -2,6 +2,9 @@ import { artisticEffects } from "./model";
 // Only these settings belong to an effect. Source, selection and finishing
 // stay in place while exploring other rendering methods.
 export const effectKeys = [
+  "reliefDepth", "reliefSlant", "reliefShade", "reliefStyle",
+  "harmonicStructure", "harmonicWarp", "harmonicWeight", "harmonicPhase", "harmonicAccent",
+  "tileDetail", "tileGap", "tileMotif",
   "cellSize",
   "method",
   "threshold",
@@ -48,6 +51,9 @@ export const effectKeys = [
   "opticalCenterX", "opticalCenterY", "opticalPhase", "targetRings", "targetSpread",
 ];
 export const effectDefaults = {
+  relief: { cellSize: 28, artColorMode: "ink" },
+  harmonics: { cellSize: 56 },
+  "adaptive-tiles": { cellSize: 56 },
   "signal-paths": { cellSize: 36 },
   schematic: { cellSize: 20 },
   "print-collage": { cellSize: 52, artColorMode: "source" },

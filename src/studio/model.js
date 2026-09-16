@@ -1,3 +1,4 @@
+import { effectScale } from "./effect-scale";
 import { sanitizeMotion } from "./motion";
 import { charPalettes, paletteSets, asciiVariants, fonts } from "../constants";
 export { asciiVariants, fonts };
@@ -29,12 +30,17 @@ export const palettes = {
   ...charPalettes,
   ...paletteSets,
 };
+export const spatialArtEffects = ["relief", "harmonics", "adaptive-tiles"];
+export const mappedArtEffects = ["relief", "adaptive-tiles", "print-collage", "marbling", "topography", "threadwork", "guilloche", "cut-paper", "glass", "arc-tiles"];
 export const materialArtEffects = ["marbling", "topography", "threadwork"];
 export const proceduralArtEffects = [...materialArtEffects, "guilloche", "cut-paper", "glass", "arc-tiles"];
 export const editorialArtEffects = ["signal-paths", "schematic", "print-collage", "optical-press"];
-export const artisticEffects = [...editorialArtEffects, ...proceduralArtEffects, "interlace", "screenprint", "contour-type", "beads", "symbols"];
+export const artisticEffects = [...spatialArtEffects, ...editorialArtEffects, ...proceduralArtEffects, "interlace", "screenprint", "contour-type", "beads", "symbols"];
 export const isArtisticLook = look => artisticEffects.includes(look.config.effect) || (look.config.effect === "mosaic" && look.config.mosaicLayout === "targets");
 export const effects = [
+  ["relief", "Paper relief", "28", "Image tones lift into layered ridges, sculpted paper, and fine occluding wire landscapes."],
+  ["harmonics", "Harmonic field", "29", "Organic membranes and oscillating lattices grow around the tones of your image."],
+  ["adaptive-tiles", "Adaptive tiles", "30", "Tiles divide around image detail, building nested chambers, striped inlays, and multiscale mosaics."],
   ["signal-paths", "Signal paths", "24", "Sweeping trails of code, colored tiles, and circular marks translate the tones of your image."],
   ["schematic", "Schematic", "25", "Dashed contours, construction boxes, and numbered callouts turn image detail into a technical drawing."],
   ["print-collage", "Print collage", "26", "A patchwork of tiny type, halftones, line screens, and sampled color, or an all-over typographic print."],
@@ -250,10 +256,25 @@ export const defaults = {
   opticalCenterX: .5,
   opticalCenterY: .5,
   opticalPhase: 0,
+  reliefDepth: 2.4,
+  reliefSlant: .25,
+  reliefShade: .55,
+  reliefStyle: "ridges",
+  harmonicStructure: "flow",
+  harmonicWarp: .7,
+  harmonicWeight: 1,
+  harmonicPhase: 0,
+  harmonicAccent: .6,
+  tileDetail: .65,
+  tileGap: .08,
+  tileMotif: "mixed",
   targetRings: 3,
   targetSpread: .65,
 };
 const numeric = {
+  reliefDepth: [0, 4], reliefSlant: [-1, 1], reliefShade: [0, 1],
+  harmonicWarp: [0, 1], harmonicWeight: [.3, 1.5], harmonicPhase: [0, 1], harmonicAccent: [0, 1],
+  tileDetail: [0, 1], tileGap: [0, .3],
   signalWarp: [0, 1], signalAngle: [-60, 60], signalDensity: [.3, 1.5],
   schematicGrid: [0, 1], schematicLabels: [0, 1], schematicWeight: [.4, 2],
   collageCoverage: [0, 1], collageDetail: [6, 16], collageBorders: [0, 1],
@@ -403,18 +424,6 @@ export function sanitizeConfig(input = {}) {
   };
   if (Object.hasOwn(legacy, c.effect)) Object.assign(c, legacy[c.effect]);
   if (!effects.some(([id]) => id === c.effect)) c.effect = defaults.effect;
-  if (["beads", "contour-type"].includes(c.effect))
-    c.cellSize = Math.max(6, c.cellSize);
-  if (c.effect === "screenprint") c.cellSize = Math.max(8, c.cellSize);
-  if (c.effect === "interlace") c.cellSize = Math.max(8, c.cellSize);
-  if (c.effect === "guilloche") c.cellSize = Math.max(8, c.cellSize);
-  if (materialArtEffects.includes(c.effect)) c.cellSize = Math.max(12, c.cellSize);
-  if (c.effect === "signal-paths") c.cellSize = Math.max(16, c.cellSize);
-  if (c.effect === "schematic") c.cellSize = Math.max(12, c.cellSize);
-  if (c.effect === "print-collage") c.cellSize = Math.max(24, c.cellSize);
-  if (c.effect === "optical-press") c.cellSize = Math.max(14, c.cellSize);
-  if (c.effect === "mosaic" && c.mosaicLayout === "targets") c.cellSize = Math.max(16, c.cellSize);
-  if (["cut-paper", "glass", "arc-tiles"].includes(c.effect)) c.cellSize = Math.max(16, c.cellSize);
   if (!methods.some(([id]) => id === c.method)) c.method = defaults.method;
   if (!Object.hasOwn(palettes, c.palette)) c.palette = defaults.palette;
   for (const k of [
@@ -433,6 +442,9 @@ export function sanitizeConfig(input = {}) {
   c.characters = c.characters || defaults.characters;
   c.font = c.font.replace(/[^\w\s-]/g, "") || "monospace";
   for (const [key, values] of Object.entries({
+    reliefStyle: ["ridges", "wire"],
+    harmonicStructure: ["flow", "lattice"],
+    tileMotif: ["mixed", "chambers", "stripes"],
     shapeColor: ["source", "palette", "ink"],
     mosaicLayout: ["staggered", "square", "targets"],
     collageStyle: ["patchwork", "type"],
@@ -449,6 +461,7 @@ export function sanitizeConfig(input = {}) {
     underlayMode: ["source", "palette"],
   }))
     if (!values.includes(c[key])) c[key] = defaults[key];
+  c.cellSize = Math.max(effectScale(c).min, c.cellSize);
   if (c.maskLow > c.maskHigh) [c.maskLow, c.maskHigh] = [c.maskHigh, c.maskLow];
   c.cropWidth = Math.min(c.cropWidth, 1 - c.cropX);
   c.cropHeight = Math.min(c.cropHeight, 1 - c.cropY);
@@ -469,7 +482,7 @@ export function sanitizeConfig(input = {}) {
 export function usesPalette(c) {
   return (
     ["dither", "dither-ascii", "palette", "interlace"].includes(c.effect) ||
-    ([...proceduralArtEffects, "print-collage"].includes(c.effect) && ["palette", "tone"].includes(c.artColorMode)) ||
+    (mappedArtEffects.includes(c.effect) && ["palette", "tone"].includes(c.artColorMode)) ||
     (c.effect === "ascii" &&
       (c.textColor === "palette" ||
         (c.underlay && c.underlayMode === "palette"))) ||
@@ -530,6 +543,22 @@ export function parsePresets(value) {
   return result;
 }
 export const looks = [
+  { name: "Porcelain ridges", note: "Paper relief / sculpted pale blue paper",
+    config: { ...defaults, effect: "relief", cellSize: 28, artColorMode: "ink", fgColor: "#bedfe8", bgColor: "#192a38", reliefDepth: 2.8, reliefSlant: .4, reliefShade: .65 } },
+  { name: "Chromatic escarpment", note: "Paper relief / stacked color landscapes",
+    config: { ...defaults, effect: "relief", cellSize: 36, artColorMode: "source", fgColor: "#eeae87", bgColor: "#152133", reliefDepth: 3.6, reliefSlant: -.4, reliefShade: .35 } },
+  { name: "Afterimage terrain", note: "Paper relief / fine luminous wire ridges",
+    config: { ...defaults, effect: "relief", cellSize: 18, artColorMode: "ink", fgColor: "#f3dfae", bgColor: "#19171c", reliefStyle: "wire", reliefDepth: 3.4, reliefSlant: 0 } },
+  { name: "Coral syntax", note: "Harmonic field / vermilion & lilac membranes",
+    config: { ...defaults, effect: "harmonics", cellSize: 60, fgColor: "#ef4b2c", accentColor: "#aba5e2", bgColor: "#f3eddb", harmonicWarp: .85, harmonicAccent: .7, harmonicWeight: 1.05 } },
+  { name: "Plasma garden", note: "Harmonic field / luminous organic channels",
+    config: { ...defaults, effect: "harmonics", cellSize: 44, fgColor: "#d2f586", accentColor: "#349b95", bgColor: "#152934", harmonicWarp: 1, harmonicAccent: .85, harmonicWeight: 1.1, artSeed: 41 } },
+  { name: "Resonant silk", note: "Harmonic field / intersecting violet lattices",
+    config: { ...defaults, effect: "harmonics", cellSize: 56, fgColor: "#5041aa", accentColor: "#ed9c7f", bgColor: "#f5e3d1", harmonicStructure: "lattice", harmonicWarp: .55, harmonicAccent: .75 } },
+  { name: "City inlay", note: "Adaptive tiles / chambers within chambers",
+    config: { ...defaults, effect: "adaptive-tiles", cellSize: 64, artColorMode: "tone", palette: "Gouache", bgColor: "#f4e6cb", tileDetail: .58, tileMotif: "chambers", tileGap: .08 } },
+  { name: "Patchwork radio", note: "Adaptive tiles / multiscale patterned inlays",
+    config: { ...defaults, effect: "adaptive-tiles", cellSize: 56, artColorMode: "source", bgColor: "#16192a", tileDetail: .58, tileMotif: "mixed", tileGap: .12, artSeed: 32, brightness: 12, saturation: 1.2 } },
   {
     name: "Cobalt code", note: "Signal paths / blue tiles & orange type",
     config: { ...defaults, effect: "signal-paths", cellSize: 36, fgColor: "#243cff", accentColor: "#ff570e", bgColor: "#d7d7d2", fillColor: "#f8f6ec", signalWarp: .55, accentAmount: .22 },

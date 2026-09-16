@@ -13,9 +13,9 @@ async function bundle(entry) {
   return import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 }
 const { FrameRenderer, drawSignal } = await bundle("src/studio/renderer.js");
-const { looks, proceduralArtEffects, materialArtEffects, editorialArtEffects } = await bundle("src/studio/model.js");
+const { looks, proceduralArtEffects, materialArtEffects, editorialArtEffects, spatialArtEffects } = await bundle("src/studio/model.js");
 const args = process.argv.slice(2).filter(arg => !arg.startsWith("--"));
-const styleLooks = looks.filter(look => process.argv.includes("--editorial")
+const styleLooks = looks.filter(look => process.argv.includes("--spatial") ? spatialArtEffects.includes(look.config.effect) : process.argv.includes("--editorial")
   ? editorialArtEffects.includes(look.config.effect) || look.config.mosaicLayout === "targets"
   : (process.argv.includes("--materials") ? materialArtEffects : proceduralArtEffects).includes(look.config.effect));
 const outputDir = args[0];
