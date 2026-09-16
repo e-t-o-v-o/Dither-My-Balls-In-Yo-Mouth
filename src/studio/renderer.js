@@ -1,4 +1,4 @@
-import { palettes, proceduralArtEffects } from "./model";
+import { palettes, proceduralArtEffects, editorialArtEffects } from "./model";
 import { adjust, dither, edge, rgb, luma, nearest } from "./pixels";
 import { SelectionRenderer } from "./selection";
 import { drawSource } from "./framing";
@@ -8,6 +8,7 @@ import { screenprint, contourType } from "./print-effects";
 import { GraphicRenderer } from "./graphics";
 import { InterlaceRenderer } from "./interlace";
 import { ArtisticRenderer } from "./artistic";
+import { EditorialRenderer } from "./editorial-art";
 import { makeCanvas } from "./canvas";
 import { activeLayers, layerConfig } from "./stack";
 function resize(c, w, h) {
@@ -68,6 +69,7 @@ export class FrameRenderer {
     this.graphic = new GraphicRenderer();
     this.interlace = new InterlaceRenderer();
     this.artistic = new ArtisticRenderer();
+    this.editorial = new EditorialRenderer();
     this.backdrop = makeCanvas();
     this.selection = new SelectionRenderer();
     this.finishing = new FinishingRenderer(this.selection);
@@ -236,9 +238,11 @@ export class FrameRenderer {
   ) {
     resize(canvas, width, height);
     const ctx = overrideContext || canvas.getContext("2d");
+    const editorial = editorialArtEffects.includes(c.effect) || (c.effect === "mosaic" && c.mosaicLayout === "targets");
+    const editorialCell = c.effect === "print-collage" ? Math.max(24, c.cellSize) * 3 / c.collageDetail : c.effect === "optical-press" ? Math.max(14, c.cellSize) / 2 : c.effect === "signal-paths" ? Math.max(16, c.cellSize) / 2 : Math.max(12, c.cellSize);
     const cell = Math.max(
       1,
-      ((c.effect === "interlace" ? Math.max(8, c.cellSize) * 2 : c.effect === "cut-paper" ? Math.max(16, c.cellSize) * 2 : c.effect === "glass" ? Math.max(16, c.cellSize) / 2 : c.effect === "beads" ? Math.max(6, c.cellSize) : c.cellSize) *
+      ((editorial ? editorialCell : c.effect === "interlace" ? Math.max(8, c.cellSize) * 2 : c.effect === "cut-paper" ? Math.max(16, c.cellSize) * 2 : c.effect === "glass" ? Math.max(16, c.cellSize) / 2 : c.effect === "beads" ? Math.max(6, c.cellSize) : c.cellSize) *
         Math.max(width, height)) /
         1920,
     );
@@ -288,7 +292,7 @@ export class FrameRenderer {
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, width, height);
     // Flatten the final composition without changing transparent effect semantics.
-    const deferredBackground = (c.effect === "interlace" || proceduralArtEffects.includes(c.effect)) && !overrideContext && !(c.maskMode !== "none" && c.maskBackdrop);
+    const deferredBackground = (editorial || c.effect === "interlace" || proceduralArtEffects.includes(c.effect)) && !overrideContext && !(c.maskMode !== "none" && c.maskBackdrop);
     if ((!c.transparent || flatten) && !omitBackground && !deferredBackground) {
       ctx.fillStyle = c.bgColor;
       ctx.fillRect(0, 0, width, height);
@@ -300,8 +304,8 @@ export class FrameRenderer {
       drawSource(source, bc, c, width, height);
       ctx.drawImage(this.backdrop, 0, 0, width, height);
     }
-    if (c.effect === "interlace" || proceduralArtEffects.includes(c.effect)) {
-      (c.effect === "interlace" ? this.interlace : this.artistic).render(ctx, data, w, h, c, width, height, palHex);
+    if (editorial || c.effect === "interlace" || proceduralArtEffects.includes(c.effect)) {
+      (editorial ? this.editorial : c.effect === "interlace" ? this.interlace : this.artistic).render(ctx, data, w, h, c, width, height, palHex);
       if (deferredBackground && (!c.transparent || flatten) && !omitBackground) {
         ctx.globalCompositeOperation = "destination-over";
         ctx.fillStyle = c.bgColor;
@@ -837,6 +841,24 @@ export class SVGContext {
       .replace(/__IMAGE_(\d+)__/g, (_, n) => `__IMAGE_${Number(n) + offset}__`);
     this.parts.push(`<g opacity="${opacity}">${parts}</g>`);
   }
+  beginAlphaMask(data, w, h) {
+    const id = `source-alpha-${this.parts.length}`, groups = new Map();
+    // Run-length encoding retains editable vector artwork and keeps simple
+    // transparent cutouts compact. Mask geometry uses the same sampled field.
+    for (let y = 0; y < h; y++) for (let x = 0; x < w;) {
+      const alpha = data[(y * w + x) * 4 + 3], start = x++;
+      while (x < w && data[(y * w + x) * 4 + 3] === alpha) x++;
+      if (alpha) {
+        const x0 = Math.round(start * this.width / w), y0 = Math.round(y * this.height / h);
+        const dx = Math.round(x * this.width / w) - x0, dy = Math.round((y + 1) * this.height / h) - y0;
+        if (!groups.has(alpha)) groups.set(alpha, []);
+        groups.get(alpha).push(`M${x0} ${y0}h${dx}v${dy}h${-dx}Z`);
+      }
+    }
+    const paths = [...groups].map(([alpha, paths]) => `<path d="${paths.join("")}" fill="white" opacity="${alpha / 255}"/>`).join("");
+    this.parts.push(`<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${this.width}" height="${this.height}" style="mask-type:alpha">${paths}</mask></defs><g mask="url(#${id})">`);
+  }
+  endAlphaMask() { this.parts.push("</g>"); }
   beginAlphaGrain() {
     this.parts = [
       `<g id="composition">${this.parts.join("")}</g><defs><mask id="grain-alpha" style="mask-type:alpha"><use xlink:href="#composition"/></mask></defs><g mask="url(#grain-alpha)">`,
