@@ -616,3 +616,44 @@ test("finishing a phone selection returns to the expanded selection controls", (
   expect(screen.queryByText("Paint selection")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Brush", exact: true })).toHaveAttribute("aria-pressed", "false");
 });
+
+test("editorial looks expose meaningful controls, inks, undo, and target discovery", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  fireEvent.change(screen.getByLabelText("Technique"), { target: { value: "signal-paths" } });
+  expect(screen.getByText("2 styles")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Cobalt code/ }));
+  expect(Number(screen.getByLabelText("Trail sweep").value)).toBeCloseTo(55);
+  fireEvent.change(screen.getByLabelText("Trail sweep"), { target: { value: "90" } });
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(Number(screen.getByLabelText("Trail sweep").value)).toBeCloseTo(55);
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  expect(screen.getByLabelText("Accent ink")).toHaveValue("#ff570e");
+  expect(screen.getByLabelText("Tile lettering")).toHaveValue("#f8f6ec");
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  fireEvent.change(screen.getByLabelText("Technique"), { target: { value: "mosaic" } });
+  expect(screen.getByText("2 styles")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Quiet targets/ }));
+  expect(screen.getByLabelText("Dot layout")).toHaveValue("targets");
+  expect(screen.getByLabelText("Rings per target")).toHaveValue("3");
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  expect(screen.getByLabelText("Inner ink")).toHaveValue("#ffdf94");
+});
+
+test("collage printing inks remain editable alongside its palette and optical structures expose relevant controls", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  fireEvent.click(screen.getByRole("button", { name: /Chromatic type/ }));
+  expect(screen.getByLabelText("Print treatment")).toHaveValue("type");
+  expect(screen.queryByLabelText("Tile borders")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  expect(screen.getByLabelText("Palette")).toHaveValue("Spectral print");
+  expect(screen.getByLabelText("Foreground color")).toHaveValue("#24192e");
+  expect(screen.getByLabelText("Print paper")).toHaveValue("#fff1d2");
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  fireEvent.click(screen.getByRole("button", { name: /Opal interference/ }));
+  expect(screen.getByLabelText("Optical structure")).toHaveValue("rings");
+  fireEvent.change(screen.getByLabelText("Optical structure"), { target: { value: "waves" } });
+  expect(screen.queryByText("Composition center")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Pattern phase")).toBeInTheDocument();
+});

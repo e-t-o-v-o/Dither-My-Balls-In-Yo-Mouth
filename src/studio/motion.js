@@ -6,6 +6,15 @@ export const motionControls = {
   contrast: ["Contrast", 0.2, 3, 0.01],
   saturation: ["Saturation", 0, 2, 0.01],
   grain: ["Grain", 0, 0.3, 0.01],
+  signalWarp: ["Trail sweep", 0, 1, .01, ["signal-paths"]],
+  signalAngle: ["Trail angle", -60, 60, 1, ["signal-paths"]],
+  schematicWeight: ["Drafting weight", .4, 2, .01, ["schematic"]],
+  opticalInterference: ["Second ink", 0, 1, .01, ["optical-press"]],
+  opticalWeight: ["Optical ink weight", .1, 1, .01, ["optical-press"]],
+  opticalBend: ["Optical ripple", 0, 1, .01, ["optical-press"]],
+  opticalCenterX: ["Optical center X", 0, 1, .01, ["optical-press"]],
+  opticalCenterY: ["Optical center Y", 0, 1, .01, ["optical-press"]],
+  opticalPhase: ["Optical phase", 0, 1, .01, ["optical-press"]],
   marbleSwirl: ["Ink swirl", 0, 1, 0.01, ["marbling"]],
   marbleWeight: ["Ink weight", 0.1, 1, 0.01, ["marbling"]],
   topoContour: ["Contour weight", 0.04, 0.6, 0.01, ["topography"]],
@@ -25,8 +34,9 @@ export const motionControls = {
   fontScale: ["Letter size", 0.4, 2, 0.01, ["ascii", "dither-ascii", "contour-type"]],
   accentAmount: ["Accent amount", 0, 1, 0.01, ["symbols"]],
 };
-export const availableMotionControls = effect => Object.entries(motionControls)
-  .filter(([, spec]) => !spec[4] || spec[4].includes(effect));
+export const availableMotionControls = (effect, config = {}) => Object.entries(motionControls)
+  .filter(([key, spec]) => (!spec[4] || spec[4].includes(effect))
+    && !(effect === "optical-press" && config.opticalPattern === "waves" && ["opticalCenterX", "opticalCenterY"].includes(key)));
 export function sanitizeMotion(input) {
   const tracks = {};
   for (const [key, spec] of Object.entries(motionControls)) {
@@ -52,7 +62,7 @@ export function configAtTime(config, time, range) {
   const next = { ...config };
   if (config.motion?.enabled) {
     const p = motionProgress(time, range, config.motion);
-    for (const [key] of availableMotionControls(config.effect)) {
+    for (const [key] of availableMotionControls(config.effect, config)) {
       const pair = config.motion.tracks[key];
       if (pair) next[key] = pair[0] + (pair[1] - pair[0]) * p;
     }

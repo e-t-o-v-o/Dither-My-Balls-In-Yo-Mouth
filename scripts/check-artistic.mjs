@@ -13,9 +13,11 @@ async function bundle(entry) {
   return import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 }
 const { FrameRenderer, drawSignal } = await bundle("src/studio/renderer.js");
-const { looks, proceduralArtEffects, materialArtEffects } = await bundle("src/studio/model.js");
+const { looks, proceduralArtEffects, materialArtEffects, editorialArtEffects } = await bundle("src/studio/model.js");
 const args = process.argv.slice(2).filter(arg => !arg.startsWith("--"));
-const styleLooks = looks.filter(look => (process.argv.includes("--materials") ? materialArtEffects : proceduralArtEffects).includes(look.config.effect));
+const styleLooks = looks.filter(look => process.argv.includes("--editorial")
+  ? editorialArtEffects.includes(look.config.effect) || look.config.mosaicLayout === "targets"
+  : (process.argv.includes("--materials") ? materialArtEffects : proceduralArtEffects).includes(look.config.effect));
 const outputDir = args[0];
 const input = args[1] ? await loadImage(args[1]) : drawSignal(createCanvas(1280, 720), 1.3);
 if (outputDir) {
@@ -46,6 +48,7 @@ if (outputDir) {
   }
   await writeFile(path.join(outputDir, "artistic-review.png"), sheet.toBuffer("image/png"));
 }
+if (process.argv.includes("--preview-only")) process.exit(0);
 // Materialize decoded pixels before timing: otherwise native canvas can replay
 // the demo's radial gradients while drawing the input into the effect sampler.
 const inputs = Array.from({ length: 8 }, (_, frame) => {
@@ -55,7 +58,7 @@ const inputs = Array.from({ length: 8 }, (_, frame) => {
   return pixels;
 });
 const timings = [];
-for (const size of [1280, 1920, 3840]) {
+for (const size of process.argv.includes("--quick") ? [1280] : [1280, 1920, 3840]) {
   for (const look of styleLooks) {
     const config = look.config;
     const renderer = new FrameRenderer(), canvas = createCanvas(size, Math.round(size * 9 / 16));

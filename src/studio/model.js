@@ -2,6 +2,8 @@ import { sanitizeMotion } from "./motion";
 import { charPalettes, paletteSets, asciiVariants, fonts } from "../constants";
 export { asciiVariants, fonts };
 export const palettes = {
+  "Spectral print": ["#2324d9", "#ee4c92", "#f47d22", "#ffe55c", "#54c6d4", "#439357", "#f4ecdd"],
+  "Toner red": ["#171616", "#f0321a", "#f4e7c9"],
   "Mineral": ["#162f3a", "#27656d", "#559c91", "#b6c8a0", "#d79d62", "#b95c43", "#eee2c5"],
   "Silk": ["#192441", "#39599a", "#528d9b", "#b36783", "#dc927c", "#e9bf77", "#f3e7cd"],
   "Gouache": ["#152b69", "#2257b8", "#25896b", "#d94d35", "#ee9689", "#efb63d", "#f4e6cb"],
@@ -29,8 +31,14 @@ export const palettes = {
 };
 export const materialArtEffects = ["marbling", "topography", "threadwork"];
 export const proceduralArtEffects = [...materialArtEffects, "guilloche", "cut-paper", "glass", "arc-tiles"];
-export const artisticEffects = [...proceduralArtEffects, "interlace", "screenprint", "contour-type", "beads", "symbols"];
+export const editorialArtEffects = ["signal-paths", "schematic", "print-collage", "optical-press"];
+export const artisticEffects = [...editorialArtEffects, ...proceduralArtEffects, "interlace", "screenprint", "contour-type", "beads", "symbols"];
+export const isArtisticLook = look => artisticEffects.includes(look.config.effect) || (look.config.effect === "mosaic" && look.config.mosaicLayout === "targets");
 export const effects = [
+  ["signal-paths", "Signal paths", "24", "Sweeping trails of code, colored tiles, and circular marks translate the tones of your image."],
+  ["schematic", "Schematic", "25", "Dashed contours, construction boxes, and numbered callouts turn image detail into a technical drawing."],
+  ["print-collage", "Print collage", "26", "A patchwork of tiny type, halftones, line screens, and sampled color, or an all-over typographic print."],
+  ["optical-press", "Optical press", "27", "Two ink plates of concentric rings, rays, or rippling lines reveal an image through their interference."],
   ["marbling", "Marbled ink", "21", "Swirling ink ribbons carry the colors and tones of your image through a fluid, fixed composition."],
   ["topography", "Contour atlas", "22", "Brightness becomes a landscape of nested color terraces or fine contour bands."],
   ["threadwork", "Threadwork", "23", "Fine bundles of stitches turn with the image's edges, building a directional textile portrait."],
@@ -66,7 +74,7 @@ export const effects = [
     "mosaic",
     "Dot mosaic",
     "12",
-    "Staggered color dots with open space between cells.",
+    "Color dots or concentric targets, with open space between marks.",
   ],
   [
     "symbols",
@@ -224,8 +232,34 @@ export const defaults = {
   stitchWidth: 0.6,
   stitchFollow: 0.85,
   stitchStrands: 2,
+  signalWarp: .65,
+  signalAngle: 0,
+  signalDensity: 1,
+  schematicGrid: .65,
+  schematicLabels: .55,
+  schematicWeight: 1,
+  schematicDashed: true,
+  collageStyle: "patchwork",
+  collageCoverage: .75,
+  collageDetail: 12,
+  collageBorders: .6,
+  opticalPattern: "rings",
+  opticalInterference: .7,
+  opticalWeight: .8,
+  opticalBend: .4,
+  opticalCenterX: .5,
+  opticalCenterY: .5,
+  opticalPhase: 0,
+  targetRings: 3,
+  targetSpread: .65,
 };
 const numeric = {
+  signalWarp: [0, 1], signalAngle: [-60, 60], signalDensity: [.3, 1.5],
+  schematicGrid: [0, 1], schematicLabels: [0, 1], schematicWeight: [.4, 2],
+  collageCoverage: [0, 1], collageDetail: [6, 16], collageBorders: [0, 1],
+  opticalInterference: [0, 1], opticalWeight: [.1, 1], opticalBend: [0, 1],
+  opticalCenterX: [0, 1], opticalCenterY: [0, 1], opticalPhase: [0, 1],
+  targetRings: [2, 5], targetSpread: [0, 1],
   marbleSwirl: [0, 1],
   marbleWeight: [0.1, 1],
   topoLevels: [3, 16],
@@ -375,6 +409,11 @@ export function sanitizeConfig(input = {}) {
   if (c.effect === "interlace") c.cellSize = Math.max(8, c.cellSize);
   if (c.effect === "guilloche") c.cellSize = Math.max(8, c.cellSize);
   if (materialArtEffects.includes(c.effect)) c.cellSize = Math.max(12, c.cellSize);
+  if (c.effect === "signal-paths") c.cellSize = Math.max(16, c.cellSize);
+  if (c.effect === "schematic") c.cellSize = Math.max(12, c.cellSize);
+  if (c.effect === "print-collage") c.cellSize = Math.max(24, c.cellSize);
+  if (c.effect === "optical-press") c.cellSize = Math.max(14, c.cellSize);
+  if (c.effect === "mosaic" && c.mosaicLayout === "targets") c.cellSize = Math.max(16, c.cellSize);
   if (["cut-paper", "glass", "arc-tiles"].includes(c.effect)) c.cellSize = Math.max(16, c.cellSize);
   if (!methods.some(([id]) => id === c.method)) c.method = defaults.method;
   if (!Object.hasOwn(palettes, c.palette)) c.palette = defaults.palette;
@@ -395,7 +434,9 @@ export function sanitizeConfig(input = {}) {
   c.font = c.font.replace(/[^\w\s-]/g, "") || "monospace";
   for (const [key, values] of Object.entries({
     shapeColor: ["source", "palette", "ink"],
-    mosaicLayout: ["staggered", "square"],
+    mosaicLayout: ["staggered", "square", "targets"],
+    collageStyle: ["patchwork", "type"],
+    opticalPattern: ["rings", "rays", "waves"],
     symbolSet: ["mixed", "orbital", "directional"],
     contourSource: ["luminance", "alpha"],
     maskMode: ["none", "luminance", "color", "manual", "matte"],
@@ -419,6 +460,8 @@ export function sanitizeConfig(input = {}) {
   c.topoLevels = Math.round(c.topoLevels);
   c.topoSoftness = Math.round(c.topoSoftness);
   c.stitchStrands = Math.round(c.stitchStrands);
+  c.collageDetail = Math.round(c.collageDetail);
+  c.targetRings = Math.round(c.targetRings);
   if (!Object.hasOwn(palettes, c.echoPalette))
     c.echoPalette = defaults.echoPalette;
   return c;
@@ -426,7 +469,7 @@ export function sanitizeConfig(input = {}) {
 export function usesPalette(c) {
   return (
     ["dither", "dither-ascii", "palette", "interlace"].includes(c.effect) ||
-    (proceduralArtEffects.includes(c.effect) && ["palette", "tone"].includes(c.artColorMode)) ||
+    ([...proceduralArtEffects, "print-collage"].includes(c.effect) && ["palette", "tone"].includes(c.artColorMode)) ||
     (c.effect === "ascii" &&
       (c.textColor === "palette" ||
         (c.underlay && c.underlayMode === "palette"))) ||
@@ -487,6 +530,50 @@ export function parsePresets(value) {
   return result;
 }
 export const looks = [
+  {
+    name: "Cobalt code", note: "Signal paths / blue tiles & orange type",
+    config: { ...defaults, effect: "signal-paths", cellSize: 36, fgColor: "#243cff", accentColor: "#ff570e", bgColor: "#d7d7d2", fillColor: "#f8f6ec", signalWarp: .55, accentAmount: .22 },
+  },
+  {
+    name: "Night transmission", note: "Signal paths / sweeping luminous trails",
+    config: { ...defaults, effect: "signal-paths", cellSize: 28, fgColor: "#2556ff", accentColor: "#ff7426", bgColor: "#101014", fillColor: "#dceaff", signalWarp: .95, signalAngle: -24, signalDensity: 1.25, accentAmount: .16, artSeed: 42 },
+  },
+  {
+    name: "Field notes", note: "Schematic / annotated yellow paper",
+    config: { ...defaults, effect: "schematic", cellSize: 20, fgColor: "#252b25", accentColor: "#3e4333", bgColor: "#f4e35c", schematicGrid: .75, schematicLabels: .65, schematicWeight: 1.2, contourLevels: 3 },
+  },
+  {
+    name: "Cyan draft", note: "Schematic / fine lines & vermilion callouts",
+    config: { ...defaults, effect: "schematic", cellSize: 16, fgColor: "#96d1e6", accentColor: "#ff7854", bgColor: "#13252f", schematicGrid: .4, schematicLabels: .4, schematicDashed: false, contourLevels: 4, artSeed: 31 },
+  },
+  {
+    name: "Archive collage", note: "Print collage / microprint patchwork",
+    config: { ...defaults, effect: "print-collage", cellSize: 52, artColorMode: "source", fgColor: "#2928a4", accentColor: "#d64427", bgColor: "#f4e7ca", fillColor: "#f4e7ca", collageCoverage: .72, collageDetail: 12, artSeed: 23 },
+  },
+  {
+    name: "Chromatic type", note: "Print collage / letters in vivid color fields",
+    config: { ...defaults, effect: "print-collage", cellSize: 40, artColorMode: "tone", palette: "Spectral print", fgColor: "#24192e", accentColor: "#ed4164", bgColor: "#f5e8ce", fillColor: "#fff1d2", collageStyle: "type", collageCoverage: 1, collageDetail: 10 },
+  },
+  {
+    name: "Toner rouge", note: "Print collage / red, charcoal & cream type",
+    config: { ...defaults, effect: "print-collage", cellSize: 40, artColorMode: "palette", palette: "Toner red", fgColor: "#191717", bgColor: "#f0321a", fillColor: "#f4e7c9", collageStyle: "type", collageCoverage: 1, collageDetail: 10, contrast: 1.25 },
+  },
+  {
+    name: "Opal interference", note: "Optical press / concentric two-ink moiré",
+    config: { ...defaults, effect: "optical-press", cellSize: 24, fgColor: "#343cab", accentColor: "#ec65a2", bgColor: "#f8f3eb", opticalWeight: .7, opticalBend: .65, opticalInterference: .9, opticalCenterX: .42, opticalCenterY: .52 },
+  },
+  {
+    name: "Solar impression", note: "Optical press / curved rays & orbital ink",
+    config: { ...defaults, effect: "optical-press", cellSize: 32, fgColor: "#f2b956", accentColor: "#ef7396", bgColor: "#201b32", opticalPattern: "rays", opticalWeight: .95, opticalBend: .8, opticalInterference: .6 },
+  },
+  {
+    name: "Chromatic orbits", note: "Dot mosaic / scattered concentric color",
+    config: { ...defaults, effect: "mosaic", cellSize: 56, mosaicLayout: "targets", shapeColor: "palette", palette: "Spectral print", bgColor: "#f4efe6", targetRings: 4, targetSpread: .9 },
+  },
+  {
+    name: "Quiet targets", note: "Dot mosaic / blue, coral & paper rings",
+    config: { ...defaults, effect: "mosaic", cellSize: 72, mosaicLayout: "targets", shapeColor: "ink", fgColor: "#223ab3", accentColor: "#ef7896", fillColor: "#ffdf94", bgColor: "#f4efe6", targetRings: 3, targetSpread: .65, dotScale: .9 },
+  },
   {
     name: "Floating ink",
     note: "Marbling / sumi-like currents",

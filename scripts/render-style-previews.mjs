@@ -21,7 +21,8 @@ async function bundle(entry) {
 const { FrameRenderer, drawSignal } = await bundle(
   path.resolve("src/studio/renderer.js"),
 );
-const { looks } = await bundle(path.resolve("src/studio/model.js"));
+const { looks: allLooks, editorialArtEffects } = await bundle(path.resolve("src/studio/model.js"));
+const looks = process.argv.includes("--editorial") ? allLooks.filter(look => editorialArtEffects.includes(look.config.effect) || look.config.mosaicLayout === "targets") : allLooks;
 const input = drawSignal(createCanvas(1280, 720), 1.3);
 const dir = path.resolve("public/styles");
 await mkdir(dir, { recursive: true });
@@ -62,6 +63,7 @@ for (const [i, look] of looks.entries()) {
   sc.font = "16px sans-serif";
   sc.fillText(look.name, x + 10, y + 169);
 }
-if (process.argv[2])
-  await writeFile(process.argv[2], sheet.toBuffer("image/png"));
+const outputPath = process.argv.slice(2).find(arg => !arg.startsWith("--"));
+if (outputPath)
+  await writeFile(outputPath, sheet.toBuffer("image/png"));
 console.log(`Rendered ${looks.length} style previews.`);

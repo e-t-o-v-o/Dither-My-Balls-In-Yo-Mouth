@@ -42,8 +42,16 @@ export const effectKeys = [
   "paperFill", "paperVeins", "glassScatter", "glassGap", "arcBands", "arcWeight",
   "marbleSwirl", "marbleWeight", "topoLevels", "topoSoftness", "topoStyle", "topoContour",
   "stitchLength", "stitchWidth", "stitchFollow", "stitchStrands",
+  "signalWarp", "signalAngle", "signalDensity", "schematicGrid", "schematicLabels",
+  "schematicWeight", "schematicDashed", "collageStyle", "collageCoverage", "collageDetail",
+  "collageBorders", "opticalPattern", "opticalInterference", "opticalWeight", "opticalBend",
+  "opticalCenterX", "opticalCenterY", "opticalPhase", "targetRings", "targetSpread",
 ];
 export const effectDefaults = {
+  "signal-paths": { cellSize: 36 },
+  schematic: { cellSize: 20 },
+  "print-collage": { cellSize: 52, artColorMode: "source" },
+  "optical-press": { cellSize: 28 },
   marbling: { cellSize: 24, artColorMode: "ink" },
   topography: { cellSize: 20, artColorMode: "tone" },
   threadwork: { cellSize: 32, artColorMode: "source" },

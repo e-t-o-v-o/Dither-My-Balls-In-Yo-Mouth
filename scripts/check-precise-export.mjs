@@ -98,9 +98,12 @@ async function bundle(entry, name) {
 }
 // Native codec callbacks do not keep Node's event loop alive on every platform.
 // Keep this check alive until completion, and fail boundedly if a codec stalls.
+// The extended artistic matrix adds eight real, 60-frame codec round trips.
+// Keep a bounded suite deadline while allowing for the additional fixtures.
+const integrationTimeout = process.argv.includes("--artistic") ? 180_000 : 120_000;
 const watchdog = setTimeout(() => {
-  throw new Error("Precise export integration check exceeded 120 seconds.");
-}, 120_000);
+  throw new Error(`Precise export integration check exceeded ${integrationTimeout / 1000} seconds.`);
+}, integrationTimeout);
 try {
   const { exportPrecise } = await bundle(
     path.join(root, "src/studio/precise-export.js"),
@@ -142,7 +145,10 @@ try {
   const cases = [["mp4", "Overprint"], ["webm", "Carbon echoes"]];
   if (process.argv.includes("--interlace")) cases.push(["mp4", "Signal weave"], ["webm", "Night ribbons"]);
   if (process.argv.includes("--artistic")) cases.push(["mp4", "Banknote"], ["webm", "Candy circuits"], ["mp4", "Paper garden"], ["webm", "Cathedral light"],
-    ["mp4", "Agate bloom"], ["webm", "Chromatic atlas"], ["mp4", "Silk study"]);
+    ["mp4", "Agate bloom"], ["webm", "Chromatic atlas"], ["mp4", "Silk study"],
+    ["mp4", "Night transmission"], ["webm", "Cyan draft"], ["mp4", "Archive collage"],
+    ["webm", "Chromatic type"], ["mp4", "Toner rouge"], ["mp4", "Opal interference"],
+    ["webm", "Solar impression"], ["mp4", "Chromatic orbits"]);
   if (process.argv.includes("--all-effects")) {
     const covered = new Set(cases.map(([, name]) => looks.find(look => look.name === name).config.effect));
     for (const [effect, name] of effects)

@@ -12,6 +12,7 @@ import {
   usesPalette,
   proceduralArtEffects,
   materialArtEffects,
+  editorialArtEffects,
 } from "./model";
 export const AdjustmentContext = createContext({ begin() {}, end() {} });
 export function Icon({ name, ...props }) {
@@ -423,10 +424,10 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
       </Dialog>}
       <section className="inspector-section effect-adjustments">
         <Range
-          label={c.effect === "interlace" ? "Module size" : ["guilloche", "marbling"].includes(c.effect) ? "Line spacing" : c.effect === "topography" ? "Contour detail" : c.effect === "threadwork" ? "Stitch size" : proceduralArtEffects.includes(c.effect) ? "Shape size" : "Cell size"}
+          label={c.effect === "print-collage" ? "Tile size" : c.effect === "schematic" ? "Drawing detail" : c.effect === "signal-paths" ? "Symbol size" : c.effect === "interlace" ? "Module size" : ["guilloche", "marbling", "optical-press"].includes(c.effect) ? "Line spacing" : c.effect === "topography" ? "Contour detail" : c.effect === "threadwork" ? "Stitch size" : proceduralArtEffects.includes(c.effect) ? "Shape size" : "Cell size"}
           value={c.cellSize}
           min={
-            materialArtEffects.includes(c.effect) ? 12 : ["cut-paper", "glass", "arc-tiles"].includes(c.effect) ? 16 : ["screenprint", "interlace", "guilloche"].includes(c.effect)
+            c.effect === "print-collage" ? 24 : c.effect === "optical-press" ? 14 : c.effect === "signal-paths" || (c.effect === "mosaic" && c.mosaicLayout === "targets") ? 16 : c.effect === "schematic" || materialArtEffects.includes(c.effect) ? 12 : ["cut-paper", "glass", "arc-tiles"].includes(c.effect) ? 16 : ["screenprint", "interlace", "guilloche"].includes(c.effect)
               ? 8
               : ["beads", "contour-type"].includes(c.effect)
                 ? 6
@@ -440,7 +441,48 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           export.
         </p>
 
-        {proceduralArtEffects.includes(c.effect) && <>
+        {c.effect === "signal-paths" && <>
+          <Range label="Trail sweep" value={c.signalWarp * 100} min={0} max={100} unit="%" onChange={v => set("signalWarp", v / 100)} />
+          <Range label="Trail angle" value={c.signalAngle} min={-60} max={60} unit="°" onChange={v => set("signalAngle", v)} />
+          <Range label="Symbol density" value={c.signalDensity * 100} min={30} max={150} unit="%" onChange={v => set("signalDensity", v / 100)} />
+          <Range label="Accent frequency" value={c.accentAmount * 100} min={0} max={100} unit="%" onChange={v => set("accentAmount", v / 100)} />
+        </>}
+        {c.effect === "schematic" && <>
+          <Select label="Trace from" value={c.contourSource} onChange={v => set("contourSource", v)}><option value="luminance">Brightness contours</option><option value="alpha">Transparency / mask edge</option></Select>
+          <Range label="Contour threshold" value={c.threshold} min={1} max={254} onChange={v => set("threshold", v)} />
+          {c.contourSource === "luminance" && <Range label="Contour levels" value={c.contourLevels} min={1} max={5} onChange={v => set("contourLevels", v)} />}
+          <Range label="Line weight" value={c.schematicWeight} min={.4} max={2} step={.05} onChange={v => set("schematicWeight", v)} />
+          <Check label="Dashed contours" value={c.schematicDashed} onChange={v => set("schematicDashed", v)} />
+          <Range label="Construction lines" value={c.schematicGrid * 100} min={0} max={100} unit="%" onChange={v => set("schematicGrid", v / 100)} />
+          <Range label="Callout density" value={c.schematicLabels * 100} min={0} max={100} unit="%" onChange={v => set("schematicLabels", v / 100)} />
+          <p className="hint">Callouts mark local image detail. They are graphic annotations, not object recognition or measurements.</p>
+        </>}
+        {c.effect === "print-collage" && <>
+          <Select label="Print treatment" value={c.collageStyle} onChange={v => set("collageStyle", v)}><option value="patchwork">Patchwork · mixed printing plates</option><option value="type">Type · letters over color</option></Select>
+          <Range label="Print coverage" value={c.collageCoverage * 100} min={0} max={100} unit="%" onChange={v => set("collageCoverage", v / 100)} />
+          <Range label="Marks per tile" value={c.collageDetail} min={6} max={16} onChange={v => set("collageDetail", v)} />
+          {c.collageStyle === "patchwork" && <Range label="Tile borders" value={c.collageBorders * 100} min={0} max={100} unit="%" onChange={v => set("collageBorders", v / 100)} />}
+          <p className="hint">Unprinted tiles retain sampled image color. Lower coverage lets more of the image show through.</p>
+        </>}
+        {c.effect === "optical-press" && <>
+          <Select label="Optical structure" value={c.opticalPattern} onChange={v => set("opticalPattern", v)}><option value="rings">Rings · concentric interference</option><option value="rays">Rays · radial fan</option><option value="waves">Waves · rippling screens</option></Select>
+          <Range label="Ink weight" value={c.opticalWeight * 100} min={10} max={100} unit="%" onChange={v => set("opticalWeight", v / 100)} />
+          <Range label="Second ink" value={c.opticalInterference * 100} min={0} max={100} unit="%" onChange={v => set("opticalInterference", v / 100)} />
+          <Range label="Ripple depth" value={c.opticalBend * 100} min={0} max={100} unit="%" onChange={v => set("opticalBend", v / 100)} />
+          <Range label="Pattern phase" value={c.opticalPhase * 100} min={0} max={100} unit="%" onChange={v => set("opticalPhase", v / 100)} />
+          {c.opticalPattern !== "waves" && <details className="inspector-section"><summary>Composition center</summary>
+            <Range label="Horizontal center" value={c.opticalCenterX * 100} min={0} max={100} unit="%" onChange={v => set("opticalCenterX", v / 100)} />
+            <Range label="Vertical center" value={c.opticalCenterY * 100} min={0} max={100} unit="%" onChange={v => set("opticalCenterY", v / 100)} />
+          </details>}
+          <p className="hint">Image brightness shapes the width of each line. Animate phase or ripple in Motion for a living print.</p>
+        </>}
+        {["signal-paths", "schematic"].includes(c.effect) && <>
+          <Range label="Pattern seed" value={c.artSeed} min={0} max={99} onChange={v => set("artSeed", v)} />
+          <button className="full" onClick={() => set("artSeed", (c.artSeed + 37) % 100)}><Icon name="spark" /> New variation</button>
+          <p className="hint">The layout stays fixed during video. Choose inks and paper in Color.</p>
+        </>}
+
+        {(proceduralArtEffects.includes(c.effect) || c.effect === "print-collage") && <>
           <Select label="Artistic color" value={c.artColorMode} onChange={v => set("artColorMode", v)}>
             <option value="palette">Match source to palette</option>
             <option value="tone">Tonal palette · expressive color</option>
@@ -616,8 +658,15 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           >
             <option value="staggered">Staggered rows</option>
             <option value="square">Square grid</option>
+            <option value="targets">Targets · concentric rings</option>
           </Select>
         )}
+        {c.effect === "mosaic" && c.mosaicLayout === "targets" && <>
+          <Range label="Rings per target" value={c.targetRings} min={2} max={5} onChange={v => set("targetRings", v)} />
+          <Range label="Scatter" value={c.targetSpread * 100} min={0} max={100} unit="%" onChange={v => set("targetSpread", v / 100)} />
+          <Range label="Pattern seed" value={c.artSeed} min={0} max={99} onChange={v => set("artSeed", v)} />
+          <p className="hint">Brightness controls each target’s size. A palette or custom inks makes the nested rings more distinct.</p>
+        </>}
         {c.effect === "symbols" && (
           <>
             <Select
@@ -944,7 +993,7 @@ export function ColorControls({
             ))}
           </Select>
           <div className="palette-grid">
-            {(c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : materialArtEffects.includes(c.effect) ? ["Mineral", "Silk", "Gouache", "Cathedral", "Candy lacquer", "Paper"] : proceduralArtEffects.includes(c.effect) ? ["Gouache", "Cathedral", "Candy lacquer", "Paper", "Signal pop", "Electric"] : [
+            {(c.effect === "print-collage" || (c.effect === "mosaic" && c.mosaicLayout === "targets") ? ["Spectral print", "Toner red", "Gouache", "Signal pop", "Electric", "Paper"] : c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : materialArtEffects.includes(c.effect) ? ["Mineral", "Silk", "Gouache", "Cathedral", "Candy lacquer", "Paper"] : proceduralArtEffects.includes(c.effect) ? ["Gouache", "Cathedral", "Candy lacquer", "Paper", "Signal pop", "Electric"] : [
               "Paper",
               "Phosphor",
               "Amber",
@@ -1005,7 +1054,7 @@ export function ColorControls({
           onChange={(v) => set("invert", v)}
         />
         <div className="color-pair">
-          {!usesPalette(c) &&
+          {(c.effect === "print-collage" || (!usesPalette(c) &&
             !(proceduralArtEffects.includes(c.effect) && c.artColorMode !== "ink") &&
             !["pixel", "channel"].includes(c.effect) &&
             !(c.effect === "screenprint" && c.screenMode === "cmyk") &&
@@ -1013,7 +1062,7 @@ export function ColorControls({
             !(
               ["mosaic", "symbols"].includes(c.effect) &&
               c.shapeColor === "source"
-            ) && (
+            ))) && (
               <ColorInput
                 label="Foreground color"
                 value={c.fgColor}
@@ -1026,6 +1075,10 @@ export function ColorControls({
             onChange={(v) => set("bgColor", v)}
           />
         </div>
+        {(editorialArtEffects.includes(c.effect) || (c.effect === "mosaic" && c.mosaicLayout === "targets" && c.shapeColor === "ink")) && <div className="color-pair">
+          {!(c.effect === "print-collage" && c.collageStyle === "type") && <ColorInput label="Accent ink" value={c.accentColor} onChange={v => set("accentColor", v)} />}
+          {["signal-paths", "print-collage", "mosaic"].includes(c.effect) && <ColorInput label={c.effect === "signal-paths" ? "Tile lettering" : c.effect === "mosaic" ? "Inner ink" : "Print paper"} value={c.fillColor} onChange={v => set("fillColor", v)} />}
+        </div>}
         <Check
           label="Transparent background"
           description="Preserved in PNG and SVG. Videos and GIF use the background color."

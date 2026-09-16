@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { looks, artisticEffects, effects } from "./model";
+import { looks, artisticEffects, effects, isArtisticLook } from "./model";
 import { drawSignal } from "./renderer";
 import { RenderService } from "./render-service";
 import { EchoSampler } from "./echo-sampler";
@@ -37,7 +37,7 @@ export function StyleBrowser({
     [rendering, setRendering] = useState(false),
     [error, setError] = useState("");
   const artistic = collection === "artistic";
-  const collectionLooks = looks.filter(look => artisticEffects.includes(look.config.effect) === artistic);
+  const collectionLooks = looks.filter(look => isArtisticLook(look) === artistic);
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const visibleLooks = collectionLooks.filter(look => (technique === "all" || look.config.effect === technique)
     && terms.every(term => `${look.name} ${look.note} ${effects.find(([id]) => id === look.config.effect)?.[3] || ""}`.toLocaleLowerCase().includes(term)));
@@ -139,7 +139,7 @@ export function StyleBrowser({
       {artistic && <label className="control technique-filter"><span className="sr-only">Technique</span>
         <select value={technique} onChange={e => onTechniqueChange(e.target.value)} disabled={busy}>
           <option value="all">All techniques</option>
-          {effects.filter(([id]) => artisticEffects.includes(id)).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          {effects.filter(([id]) => artisticEffects.includes(id) || id === "mosaic").map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
       </label>}
       </div>

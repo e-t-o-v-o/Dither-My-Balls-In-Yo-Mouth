@@ -1,4 +1,4 @@
-import { configAtTime, motionProgress, sanitizeMotion } from "./motion";
+import { availableMotionControls, configAtTime, motionProgress, sanitizeMotion } from "./motion";
 import { defaults, sanitizeConfig } from "./model";
 import { parseProject } from "./projects";
 import { exportKey } from "./workflow";
@@ -46,4 +46,16 @@ test("export estimates wait for useful progress and do not invent a stalled coun
   expect(exportTiming(20, 0.98, 0)).toBe("");
   expect(exportTiming(20, 0.5, 0, false)).toBe("");
   expect(exportTiming(40, 0.5, 22)).toMatch(/Waiting for the encoder/);
+});
+
+test("optical wave mode hides inapplicable center tracks and restores them for radial patterns", () => {
+  const c = sanitizeConfig({ effect: "optical-press", opticalPattern: "waves", motion: {
+    enabled: true, easing: "linear", tracks: { opticalCenterX: [0, 1], opticalPhase: [0, 1] },
+  } });
+  expect(availableMotionControls(c.effect, c).map(([key]) => key)).not.toContain("opticalCenterX");
+  expect(configAtTime(c, .25, [0, 1])).toMatchObject({ opticalCenterX: .5, opticalPhase: .25 });
+  const radial = { ...c, opticalPattern: "rays" };
+  expect(availableMotionControls(radial.effect, radial).map(([key]) => key)).toContain("opticalCenterX");
+  expect(configAtTime(radial, .25, [0, 1]).opticalCenterX).toBe(.25);
+  expect(c.motion.tracks.opticalCenterX).toEqual([0, 1]);
 });

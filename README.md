@@ -18,11 +18,12 @@ Video import starts muted decoding and opens on a paused first frame. If the bro
 ## What is included
 
 - Six distinct color-aware dithering methods: Bayer, Floyd–Steinberg, Atkinson, Jarvis–Judice–Ninke, Burkes, and Sierra.
-- Twenty-two focused effects, including Marbled ink, Contour atlas, Threadwork, Guilloché, Cut paper, Facet glass, Arc tiles, Interlace, and the classic print, type, dither, and color tools. Dither + ASCII is an ASCII mode, with legacy presets preserved. Artistic, Graphic, Digital, and Utilities families keep the picker compact.
+- Twenty-six focused effects, including Signal paths, Schematic, Print collage, Optical press, Marbled ink, Contour atlas, Threadwork, Guilloché, Cut paper, Facet glass, Arc tiles, Interlace, and the classic print, type, dither, and color tools. Dither + ASCII is an ASCII mode, with legacy presets preserved. Artistic, Graphic, Digital, and Utilities families keep the picker compact.
 - Browse and Adjust return to their last tab and panel size. Studio and Artistic searches, per-layer scroll positions, and motion endpoints remain available as you move around the workspace. These session preferences do not affect undo history or saved projects. Finishing a phone selection returns to its controls. Completed exports return focus to the finished file.
 - Look previews use the same framing, added layers, and trim-relative animation as applying a look. Moving to another frame clears stale previews.
-- Thirty-two style starters. The Artistic tab curates twenty-two across twelve techniques and remembers the selected technique while editing. Search by name, material, or description; expand the gallery without losing the filter. Cards distinguish sample artwork from previews of your frame. Preview visible results on demand and stop a batch at any time.
+- Forty-three style starters. The Artistic tab curates thirty-three across seventeen techniques and remembers the selected technique while editing. Search by name, material, or description; expand the gallery without losing the filter. Cards distinguish sample artwork from previews of your frame. Preview visible results on demand and stop a batch at any time.
 - Seven procedural artistic renderers: swirling marbled ink, topographic color terraces, directional thread bundles, engraved wave fields, cut-paper leaves and petals, irregular triangular glass, and connected Truchet arc ribbons. Fourteen starters and five curated ink palettes. **New variation** explores another seeded composition with Undo for comparison.
+- Four editorial artistic effects translate reference ideas into image-responsive code trails, annotated drawings, microprint collages, and two-ink optical fields. Eleven starters include concentric **Targets** in Dot mosaic, and two new palettes. All work with images, video, layers, selections, and exports.
 - Interlace reconstructs images and video with interlocking bands and stepped ribbons. Source-color and tonal-ink mapping, three reference-inspired palettes, and stable pattern seeds support both recognizable treatments and abstract graphic compositions.
 - Brightness/color selection, original-source eyedropper, paint/erase/lasso corrections, imported mattes, selection overlay, and optional original backdrop. Selection is manual or tonal; there is no automatic subject detection.
 - CMYK/duotone screens, contour lettering, fixed-time color echoes, effect/source mixing, and normalized paper grain.
@@ -96,6 +97,7 @@ The checked-in Netlify configuration continues to publish `build/`. Vite uses re
 - `src/studio/print-effects.js`, `finishing.js`, `echo-sampler.js`: print/type treatments, compositing, and fixed media-time echo samples.
 - `src/studio/artistic.js`: shared raster/vector geometry for engraving, paper, glass, and arc tiles.
 - `src/studio/material-art.js`: cached marbling fields, brightness terraces, and edge-following threadwork.
+- `src/studio/editorial-art.js`, `print-plate.js`: source-responsive print systems, bounded glyph masks, reusable raster buffers, cached optical geometry, and shared SVG geometry.
 - `src/studio/interlace.js`: deterministic loom layout and shared raster/vector ink geometry.
 - `src/studio/use-appearance.js`, `use-workspace.js`, `use-canvas-gestures.js`: appearance, adaptive layout, and view-only navigation.
 - `src/studio/CropEditor.jsx`, `crop-geometry.js`, `TimeField.jsx`: staged source framing and precise committed values.
@@ -129,3 +131,5 @@ See [Design workspace](docs/DESIGN-WORKSPACE.md) for the responsive redesign, in
 See [Interlace](docs/INTERLACE.md) for the reference-inspired filter, controls, and validation.
 
 See [Artistic collection](docs/ARTISTIC-COLLECTION.md) for inspiration sources, renderer behavior, and validation. Reproduce the artwork review and timings with `node scripts/check-artistic.mjs /path/to/review`.
+
+See [Editorial prints](docs/EDITORIAL-PRINTS.md) for the latest reference-inspired effects, controls, and rendering guarantees. Reproduce their contact sheets with `node scripts/check-artistic.mjs /path/to/review --editorial --preview-only`.
