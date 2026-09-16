@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { StyleBrowser } from "./StyleBrowser";
 import { defaults } from "./model";
 const { renderFrame } = vi.hoisted(() => ({ renderFrame: vi.fn(async () => {}) }));
@@ -25,5 +25,20 @@ test("look thumbnails include added layers and their animation timing, then expi
   }
   expect(view.container.querySelector(".style-preview").src).toContain("data:image/png");
   view.rerender(<StyleBrowser {...props} time={3.5} />);
+  expect(view.container.querySelector(".style-preview").src).not.toContain("data:image/png");
+});
+
+test("stopping a preview is immediate and a late failure cannot replace the current gallery", async () => {
+  let reject;
+  renderFrame.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }));
+  const props = { config: defaults, source: { kind: "video", width: 1280, height: 720, element: document.createElement("video") }, time: 1, trim: [0, 2], onPause: vi.fn(), onApply: vi.fn() };
+  const view = render(<StyleBrowser {...props} />);
+  fireEvent.click(screen.getByRole("button", { name: "Preview looks on this frame" }));
+  await waitFor(() => expect(reject).toBeTypeOf("function"));
+  fireEvent.click(screen.getByRole("button", { name: /Stop previews/ }));
+  expect(screen.getByRole("button", { name: "Preview looks on this frame" })).toBeEnabled();
+  view.rerender(<StyleBrowser {...props} time={2} />);
+  await act(async () => reject(new Error("Old preview failed")));
+  expect(screen.queryByText("Old preview failed")).not.toBeInTheDocument();
   expect(view.container.querySelector(".style-preview").src).not.toContain("data:image/png");
 });

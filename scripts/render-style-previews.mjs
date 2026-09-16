@@ -21,8 +21,8 @@ async function bundle(entry) {
 const { FrameRenderer, drawSignal } = await bundle(
   path.resolve("src/studio/renderer.js"),
 );
-const { looks: allLooks, editorialArtEffects } = await bundle(path.resolve("src/studio/model.js"));
-const looks = process.argv.includes("--editorial") ? allLooks.filter(look => editorialArtEffects.includes(look.config.effect) || look.config.mosaicLayout === "targets") : allLooks;
+const { looks: allLooks, editorialArtEffects, spatialArtEffects } = await bundle(path.resolve("src/studio/model.js"));
+const looks = process.argv.includes("--spatial") ? allLooks.filter(look => spatialArtEffects.includes(look.config.effect)) : process.argv.includes("--editorial") ? allLooks.filter(look => editorialArtEffects.includes(look.config.effect) || look.config.mosaicLayout === "targets") : allLooks;
 const input = drawSignal(createCanvas(1280, 720), 1.3);
 const dir = path.resolve("public/styles");
 await mkdir(dir, { recursive: true });

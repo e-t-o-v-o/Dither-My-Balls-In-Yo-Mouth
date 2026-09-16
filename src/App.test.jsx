@@ -657,3 +657,30 @@ test("collage printing inks remain editable alongside its palette and optical st
   expect(screen.queryByText("Composition center")).not.toBeInTheDocument();
   expect(screen.getByLabelText("Pattern phase")).toBeInTheDocument();
 });
+
+test("spatial looks expose their own scales, relevant controls, and inks", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  fireEvent.change(screen.getByLabelText("Technique"), { target: { value: "relief" } });
+  expect(screen.getByText("3 styles")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Porcelain ridges/ }));
+  expect(screen.getByLabelText("Ridge spacing")).toHaveAttribute("min", "16");
+  expect(screen.queryByLabelText("Pattern seed")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Relief treatment"), { target: { value: "wire" } });
+  expect(screen.queryByLabelText("Relief shading")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(screen.getByLabelText("Relief shading")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  fireEvent.change(screen.getByLabelText("Technique"), { target: { value: "harmonics" } });
+  fireEvent.click(screen.getByRole("button", { name: /Coral syntax/ }));
+  expect(screen.getByLabelText("Pattern scale")).toHaveAttribute("min", "32");
+  expect(screen.queryByLabelText("Artistic color")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  expect(screen.getByLabelText("Accent ink")).toHaveValue("#aba5e2");
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  fireEvent.change(screen.getByLabelText("Technique"), { target: { value: "adaptive-tiles" } });
+  fireEvent.click(screen.getByRole("button", { name: /Patchwork radio/ }));
+  expect(screen.getByLabelText("Artistic color")).toHaveValue("source");
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  expect(screen.queryByLabelText("Foreground color")).not.toBeInTheDocument();
+});

@@ -1,4 +1,5 @@
-import { palettes, proceduralArtEffects, editorialArtEffects } from "./model";
+import { palettes, proceduralArtEffects, editorialArtEffects, spatialArtEffects } from "./model";
+import { effectScale } from "./effect-scale";
 import { adjust, dither, edge, rgb, luma, nearest } from "./pixels";
 import { SelectionRenderer } from "./selection";
 import { drawSource } from "./framing";
@@ -238,14 +239,8 @@ export class FrameRenderer {
   ) {
     resize(canvas, width, height);
     const ctx = overrideContext || canvas.getContext("2d");
-    const editorial = editorialArtEffects.includes(c.effect) || (c.effect === "mosaic" && c.mosaicLayout === "targets");
-    const editorialCell = c.effect === "print-collage" ? Math.max(24, c.cellSize) * 3 / c.collageDetail : c.effect === "optical-press" ? Math.max(14, c.cellSize) / 2 : c.effect === "signal-paths" ? Math.max(16, c.cellSize) / 2 : Math.max(12, c.cellSize);
-    const cell = Math.max(
-      1,
-      ((editorial ? editorialCell : c.effect === "interlace" ? Math.max(8, c.cellSize) * 2 : c.effect === "cut-paper" ? Math.max(16, c.cellSize) * 2 : c.effect === "glass" ? Math.max(16, c.cellSize) / 2 : c.effect === "beads" ? Math.max(6, c.cellSize) : c.cellSize) *
-        Math.max(width, height)) /
-        1920,
-    );
+    const editorial = spatialArtEffects.includes(c.effect) || editorialArtEffects.includes(c.effect) || (c.effect === "mosaic" && c.mosaicLayout === "targets");
+    const cell = Math.max(1, effectScale(c).sampleSize * Math.max(width, height) / 1920);
     const w = Math.max(1, Math.ceil(width / cell));
     const h = Math.max(1, Math.ceil(height / cell));
     const cw = width / w,

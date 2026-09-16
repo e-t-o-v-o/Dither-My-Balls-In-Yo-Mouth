@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useId, useRef, useState, useEffect } from "react";
 import { effectFamily, effectDefaults, effectSnapshot } from "./effect-registry";
+import { effectScale } from "./effect-scale";
 import { Dialog } from "./Dialog";
 import {
   effects,
@@ -10,7 +11,7 @@ import {
   fonts,
   asciiVariants,
   usesPalette,
-  proceduralArtEffects,
+  mappedArtEffects,
   materialArtEffects,
   editorialArtEffects,
 } from "./model";
@@ -424,15 +425,9 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
       </Dialog>}
       <section className="inspector-section effect-adjustments">
         <Range
-          label={c.effect === "print-collage" ? "Tile size" : c.effect === "schematic" ? "Drawing detail" : c.effect === "signal-paths" ? "Symbol size" : c.effect === "interlace" ? "Module size" : ["guilloche", "marbling", "optical-press"].includes(c.effect) ? "Line spacing" : c.effect === "topography" ? "Contour detail" : c.effect === "threadwork" ? "Stitch size" : proceduralArtEffects.includes(c.effect) ? "Shape size" : "Cell size"}
+          label={effectScale(c).label}
           value={c.cellSize}
-          min={
-            c.effect === "print-collage" ? 24 : c.effect === "optical-press" ? 14 : c.effect === "signal-paths" || (c.effect === "mosaic" && c.mosaicLayout === "targets") ? 16 : c.effect === "schematic" || materialArtEffects.includes(c.effect) ? 12 : ["cut-paper", "glass", "arc-tiles"].includes(c.effect) ? 16 : ["screenprint", "interlace", "guilloche"].includes(c.effect)
-              ? 8
-              : ["beads", "contour-type"].includes(c.effect)
-                ? 6
-                : 2
-          }
+          min={effectScale(c).min}
           max={80}
           onChange={(v) => set("cellSize", v)}
         />
@@ -440,6 +435,32 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           Smaller cells preserve more detail. The pattern scales with your
           export.
         </p>
+
+        {c.effect === "relief" && <>
+          <Select label="Relief treatment" value={c.reliefStyle} onChange={v => set("reliefStyle", v)}><option value="ridges">Ridges · sculpted paper</option><option value="wire">Wire · fine occluding lines</option></Select>
+          <Range label="Relief height" value={c.reliefDepth} min={0} max={4} step={.05} onChange={v => set("reliefDepth", v)} />
+          <Range label="Relief slant" value={c.reliefSlant * 100} min={-100} max={100} unit="%" onChange={v => set("reliefSlant", v / 100)} />
+          {c.reliefStyle === "ridges" && <Range label="Relief shading" value={c.reliefShade * 100} min={0} max={100} unit="%" onChange={v => set("reliefShade", v / 100)} />}
+          <p className="hint">Image tones raise each ridge. Dark and light backgrounds reverse which tones rise. Try animating the height in Motion.</p>
+        </>}
+        {c.effect === "harmonics" && <>
+          <Select label="Harmonic structure" value={c.harmonicStructure} onChange={v => set("harmonicStructure", v)}><option value="flow">Flow · organic membranes</option><option value="lattice">Lattice · intersecting waves</option></Select>
+          <Range label="Field flow" value={c.harmonicWarp * 100} min={0} max={100} unit="%" onChange={v => set("harmonicWarp", v / 100)} />
+          <Range label="Field ink weight" value={c.harmonicWeight * 100} min={30} max={150} unit="%" onChange={v => set("harmonicWeight", v / 100)} />
+          <Range label="Field phase" value={c.harmonicPhase * 100} min={0} max={100} unit="%" onChange={v => set("harmonicPhase", v / 100)} />
+          <Range label="Membrane edge" value={c.harmonicAccent * 100} min={0} max={100} unit="%" onChange={v => set("harmonicAccent", v / 100)} />
+          <p className="hint">Source tones open and close the channels. Phase and flow can animate independently of the video.</p>
+        </>}
+        {c.effect === "adaptive-tiles" && <>
+          <Select label="Tile motifs" value={c.tileMotif} onChange={v => set("tileMotif", v)}><option value="mixed">Mixed · chambers, stripes & discs</option><option value="chambers">Chambers · nested inlays</option><option value="stripes">Stripes · woven screens</option></Select>
+          <Range label="Follow image detail" value={c.tileDetail * 100} min={0} max={100} unit="%" onChange={v => set("tileDetail", v / 100)} />
+          <Range label="Tile spacing" value={c.tileGap * 100} min={0} max={30} unit="%" onChange={v => set("tileGap", v / 100)} />
+          <p className="hint">Large tiles divide where the image changes most. Transitions soften subdivision changes during video.</p>
+        </>}
+        {c.effect === "harmonics" && <>
+          <Range label="Pattern seed" value={c.artSeed} min={0} max={99} onChange={v => set("artSeed", v)} />
+          <button className="full" onClick={() => set("artSeed", (c.artSeed + 37) % 100)}><Icon name="spark" /> New variation</button>
+        </>}
 
         {c.effect === "signal-paths" && <>
           <Range label="Trail sweep" value={c.signalWarp * 100} min={0} max={100} unit="%" onChange={v => set("signalWarp", v / 100)} />
@@ -482,7 +503,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           <p className="hint">The layout stays fixed during video. Choose inks and paper in Color.</p>
         </>}
 
-        {(proceduralArtEffects.includes(c.effect) || c.effect === "print-collage") && <>
+        {mappedArtEffects.includes(c.effect) && <>
           <Select label="Artistic color" value={c.artColorMode} onChange={v => set("artColorMode", v)}>
             <option value="palette">Match source to palette</option>
             <option value="tone">Tonal palette · expressive color</option>
@@ -527,7 +548,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
             <Range label="Thread weight" value={c.stitchWidth * 100} min={15} max={100} unit="%" onChange={v => set("stitchWidth", v / 100)} />
             <Range label="Strands per stitch" value={c.stitchStrands} min={1} max={3} onChange={v => set("stitchStrands", v)} />
           </>}
-          {c.effect !== "topography" && <>
+          {!["topography", "relief"].includes(c.effect) && <>
             <Range label="Pattern seed" value={c.artSeed} min={0} max={99} onChange={v => set("artSeed", v)} />
             <button className="full" onClick={() => set("artSeed", (c.artSeed + 37) % 100)}><Icon name="spark" /> New variation</button>
             <p className="hint">Explore another composition, then Undo to compare. The seed stays fixed throughout your video. Choose inks and paper in Color.</p>
@@ -993,7 +1014,7 @@ export function ColorControls({
             ))}
           </Select>
           <div className="palette-grid">
-            {(c.effect === "print-collage" || (c.effect === "mosaic" && c.mosaicLayout === "targets") ? ["Spectral print", "Toner red", "Gouache", "Signal pop", "Electric", "Paper"] : c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : materialArtEffects.includes(c.effect) ? ["Mineral", "Silk", "Gouache", "Cathedral", "Candy lacquer", "Paper"] : proceduralArtEffects.includes(c.effect) ? ["Gouache", "Cathedral", "Candy lacquer", "Paper", "Signal pop", "Electric"] : [
+            {(c.effect === "print-collage" || (c.effect === "mosaic" && c.mosaicLayout === "targets") ? ["Spectral print", "Toner red", "Gouache", "Signal pop", "Electric", "Paper"] : c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : materialArtEffects.includes(c.effect) ? ["Mineral", "Silk", "Gouache", "Cathedral", "Candy lacquer", "Paper"] : mappedArtEffects.includes(c.effect) ? ["Gouache", "Cathedral", "Candy lacquer", "Paper", "Signal pop", "Electric"] : [
               "Paper",
               "Phosphor",
               "Amber",
@@ -1055,7 +1076,7 @@ export function ColorControls({
         />
         <div className="color-pair">
           {(c.effect === "print-collage" || (!usesPalette(c) &&
-            !(proceduralArtEffects.includes(c.effect) && c.artColorMode !== "ink") &&
+            !(mappedArtEffects.includes(c.effect) && c.artColorMode !== "ink") &&
             !["pixel", "channel"].includes(c.effect) &&
             !(c.effect === "screenprint" && c.screenMode === "cmyk") &&
             !(c.effect === "ascii" && c.textColor !== "foreground") &&
@@ -1075,7 +1096,7 @@ export function ColorControls({
             onChange={(v) => set("bgColor", v)}
           />
         </div>
-        {(editorialArtEffects.includes(c.effect) || (c.effect === "mosaic" && c.mosaicLayout === "targets" && c.shapeColor === "ink")) && <div className="color-pair">
+        {(c.effect === "harmonics" || editorialArtEffects.includes(c.effect) || (c.effect === "mosaic" && c.mosaicLayout === "targets" && c.shapeColor === "ink")) && <div className="color-pair">
           {!(c.effect === "print-collage" && c.collageStyle === "type") && <ColorInput label="Accent ink" value={c.accentColor} onChange={v => set("accentColor", v)} />}
           {["signal-paths", "print-collage", "mosaic"].includes(c.effect) && <ColorInput label={c.effect === "signal-paths" ? "Tile lettering" : c.effect === "mosaic" ? "Inner ink" : "Print paper"} value={c.fillColor} onChange={v => set("fillColor", v)} />}
         </div>}

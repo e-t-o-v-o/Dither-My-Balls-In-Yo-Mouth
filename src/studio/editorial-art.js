@@ -1,6 +1,8 @@
 import { makeCanvas } from "./canvas";
 import { contourPaths } from "./graphics";
 import { rgb, luma, nearest } from "./pixels";
+import { SpatialRenderer } from "./spatial-art";
+import { spatialArtEffects } from "./model";
 import { PrintPlate } from "./print-plate";
 
 const TAU = Math.PI * 2;
@@ -47,6 +49,7 @@ export class EditorialRenderer {
     this.layer = makeCanvas();
     this.alpha = makeCanvas();
     this.plate = new PrintPlate();
+    this.spatial = new SpatialRenderer();
     this.colors = new Map();
   }
   render(target, data, w, h, c, width, height, palette) {
@@ -116,7 +119,8 @@ export class EditorialRenderer {
       }
       return this.colors.get(k);
     };
-    if (c.effect === "signal-paths") this.signal(ctx, sample, tone, c, width, height, scale);
+    if (spatialArtEffects.includes(c.effect)) this.spatial.render(ctx, sample, color, tone, c, width, height, scale, w, h, data);
+    else if (c.effect === "signal-paths") this.signal(ctx, sample, tone, c, width, height, scale);
     else if (c.effect === "schematic") this.schematic(ctx, data, w, h, sample, tone, c, width, height, scale);
     else if (c.effect === "print-collage") this.collage(ctx, sample, color, tone, c, width, height, scale);
     else if (c.effect === "optical-press") this.optical(ctx, c, width, height, scale);
@@ -125,9 +129,11 @@ export class EditorialRenderer {
     ctx.globalAlpha = 1;
     if (partial && !vector) {
       resize(this.alpha, w, h);
-      const bytes = new Uint8ClampedArray(data.length);
+      if (this.maskImage?.width !== w || this.maskImage?.height !== h)
+        this.maskImage = new ImageData(new Uint8ClampedArray(data.length), w, h);
+      const bytes = this.maskImage.data;
       for (let i = 3; i < bytes.length; i += 4) bytes[i] = data[i];
-      this.alpha.getContext("2d").putImageData(new ImageData(bytes, w, h), 0, 0);
+      this.alpha.getContext("2d").putImageData(this.maskImage, 0, 0);
       ctx.globalCompositeOperation = "destination-in";
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(this.alpha, 0, 0, width, height);

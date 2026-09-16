@@ -1,6 +1,15 @@
 // Animate continuous controls only: changing seeds, grid topology, or crop size
 // between frames would create jumps or change the encoder's frame dimensions.
 export const motionControls = {
+  reliefDepth: ["Relief height", 0, 4, .01, ["relief"]],
+  reliefSlant: ["Relief slant", -1, 1, .01, ["relief"]],
+  reliefShade: ["Relief shading", 0, 1, .01, ["relief"]],
+  harmonicWarp: ["Harmonic flow", 0, 1, .01, ["harmonics"]],
+  harmonicWeight: ["Harmonic ink weight", .3, 1.5, .01, ["harmonics"]],
+  harmonicPhase: ["Harmonic phase", 0, 1, .01, ["harmonics"]],
+  harmonicAccent: ["Harmonic second ink", 0, 1, .01, ["harmonics"]],
+  tileDetail: ["Tile detail", 0, 1, .01, ["adaptive-tiles"]],
+  tileGap: ["Tile spacing", 0, .3, .01, ["adaptive-tiles"]],
   effectMix: ["Effect blend", 0, 1, 0.01],
   brightness: ["Brightness", -100, 100, 1],
   contrast: ["Contrast", 0.2, 3, 0.01],
@@ -36,6 +45,7 @@ export const motionControls = {
 };
 export const availableMotionControls = (effect, config = {}) => Object.entries(motionControls)
   .filter(([key, spec]) => (!spec[4] || spec[4].includes(effect))
+    && !(effect === "relief" && config.reliefStyle === "wire" && key === "reliefShade")
     && !(effect === "optical-press" && config.opticalPattern === "waves" && ["opticalCenterX", "opticalCenterY"].includes(key)));
 export function sanitizeMotion(input) {
   const tracks = {};

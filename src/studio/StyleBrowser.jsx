@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { looks, artisticEffects, effects, isArtisticLook } from "./model";
+import { looks, effects, isArtisticLook } from "./model";
 import { drawSignal } from "./renderer";
 import { RenderService } from "./render-service";
 import { EchoSampler } from "./echo-sampler";
@@ -42,15 +42,21 @@ export function StyleBrowser({
   const visibleLooks = collectionLooks.filter(look => (technique === "all" || look.config.effect === technique)
     && terms.every(term => `${look.name} ${look.note} ${effects.find(([id]) => id === look.config.effect)?.[3] || ""}`.toLocaleLowerCase().includes(term)));
   const controller = useRef();
-  useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => () => {
+    controller.current?.abort();
+    controller.current = null;
+  }, []);
   useEffect(() => {
     controller.current?.abort();
+    controller.current = null;
     setPreviews({});
     setRendering(false);
     setError("");
-  }, [config, source, keepMask, collection, technique, query, time, trim]);
+  }, [config, source, keepMask, collection, technique, query, time, trim, expanded]);
   const close = () => {
     controller.current?.abort();
+    controller.current = null;
+    setRendering(false);
   };
   const preview = async () => {
     onPause();
@@ -94,7 +100,7 @@ export function StyleBrowser({
           }));
       }
     } catch (e) {
-      if (e.name !== "AbortError") setError(e.message);
+      if (controller.current === abort && !abort.signal.aborted && e.name !== "AbortError") setError(e.message);
     } finally {
       service.dispose();
       echoes.dispose();
@@ -139,7 +145,7 @@ export function StyleBrowser({
       {artistic && <label className="control technique-filter"><span className="sr-only">Technique</span>
         <select value={technique} onChange={e => onTechniqueChange(e.target.value)} disabled={busy}>
           <option value="all">All techniques</option>
-          {effects.filter(([id]) => artisticEffects.includes(id) || id === "mosaic").map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          {effects.filter(([id]) => collectionLooks.some(look => look.config.effect === id)).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
       </label>}
       </div>

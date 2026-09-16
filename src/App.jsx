@@ -19,7 +19,7 @@ import {
   timeLabel,
   filename,
   usesPalette,
-  proceduralArtEffects,
+  mappedArtEffects,
 } from "./studio/model";
 import { planVideoExport } from "./studio/export-plan";
 import { exportPrecise, hasPreciseExport } from "./studio/precise-export";
@@ -124,7 +124,7 @@ function App() {
       : paletteEffect
         ? `${palettes[config.palette].length} palette colors`
         : ["pixel", "channel"].includes(config.effect) ||
-            ([...proceduralArtEffects, "print-collage"].includes(config.effect) && config.artColorMode === "source") ||
+            (mappedArtEffects.includes(config.effect) && config.artColorMode === "source") ||
             (config.effect === "ascii" && config.textColor === "source") ||
             (["mosaic", "symbols"].includes(config.effect) &&
               config.shapeColor === "source")
