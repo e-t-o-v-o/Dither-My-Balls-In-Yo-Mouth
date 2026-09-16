@@ -34,8 +34,9 @@ export const motionControls = {
   fontScale: ["Letter size", 0.4, 2, 0.01, ["ascii", "dither-ascii", "contour-type"]],
   accentAmount: ["Accent amount", 0, 1, 0.01, ["symbols"]],
 };
-export const availableMotionControls = effect => Object.entries(motionControls)
-  .filter(([, spec]) => !spec[4] || spec[4].includes(effect));
+export const availableMotionControls = (effect, config = {}) => Object.entries(motionControls)
+  .filter(([key, spec]) => (!spec[4] || spec[4].includes(effect))
+    && !(effect === "optical-press" && config.opticalPattern === "waves" && ["opticalCenterX", "opticalCenterY"].includes(key)));
 export function sanitizeMotion(input) {
   const tracks = {};
   for (const [key, spec] of Object.entries(motionControls)) {
@@ -61,7 +62,7 @@ export function configAtTime(config, time, range) {
   const next = { ...config };
   if (config.motion?.enabled) {
     const p = motionProgress(time, range, config.motion);
-    for (const [key] of availableMotionControls(config.effect)) {
+    for (const [key] of availableMotionControls(config.effect, config)) {
       const pair = config.motion.tracks[key];
       if (pair) next[key] = pair[0] + (pair[1] - pair[0]) * p;
     }
