@@ -151,7 +151,7 @@ export function StyleBrowser({
       </div>
       {config.maskMode !== "none" && <label className="check style-options"><input type="checkbox" checked={keepMask} onChange={e => setKeepMask(e.target.checked)} disabled={busy} /><span>Keep selection when changing looks</span></label>}
       {config.stack.length > 1 && <p className="hint gallery-scope">Replaces the main effect · Keeps your added layers</p>}
-      <div className="gallery-toolbar"><span>{visibleLooks.length} styles</span><button className="small style-preview-button" aria-label={rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview looks on this frame"} onClick={rendering ? close : preview} disabled={busy || !visibleLooks.length}>
+      <div className="gallery-toolbar"><span>{visibleLooks.length} {visibleLooks.length === 1 ? "style" : "styles"}</span><button className="small style-preview-button" aria-label={rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview looks on this frame"} onClick={rendering ? close : preview} disabled={busy || !visibleLooks.length}>
         {rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview your frame"}
       </button></div>
       {error && <p className="inline-error">{error}</p>}

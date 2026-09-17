@@ -57,7 +57,7 @@ button, .button {
 }
 button:hover:not(:disabled), .button:hover { background: var(--hover); }
 button.primary, .button.primary { background: var(--action); color: var(--action-ink); border-radius: 999px; font-weight: 500; padding-inline: 20px; }
-.primary:hover:not(:disabled) { filter: brightness(.95); }
+.primary:hover:not(:disabled) { background: var(--action); filter: brightness(.95); }
 .icon-button { width: 44px; min-width: 44px; padding: 10px; background: transparent; }
 .small { min-height: 40px; padding: 6px 10px; background: transparent; }
 .quiet, .text-button { background: transparent; }
@@ -124,8 +124,8 @@ input[type="range"] { appearance: none; -webkit-appearance: none; display: block
 input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 3px; background: linear-gradient(to right, var(--control) var(--range-progress, 0%), var(--line) var(--range-progress, 0%)); }
 input[type="range"]::-moz-range-track { height: 4px; border-radius: 3px; background: var(--line); }
 input[type="range"]::-moz-range-progress { height: 4px; background: var(--control); }
-input[type="range"]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border: 1px solid #00000012; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 4px #0003; }
-input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border: 1px solid #00000012; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 4px #0003; }
+input[type="range"]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border: 1px solid var(--control); border-radius: 50%; background: #ffffff; box-shadow: 0 1px 4px #0003; }
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border: 1px solid var(--control); border-radius: 50%; background: #ffffff; box-shadow: 0 1px 4px #0003; }
 .scrubber input.playhead { position: absolute; inset: 0; height: 44px; margin: 0; z-index: 1; }
 .scrubber .playhead::-webkit-slider-runnable-track { background: transparent; }
 .scrubber .playhead::-moz-range-track, .scrubber .playhead::-moz-range-progress { background: transparent; }
@@ -414,6 +414,15 @@ kbd { display: inline-block; font-size: .8125rem; padding: 2px 6px; border: 1px 
   .effect-note { margin-inline: 10px; }
   .trim-fields { gap: 12px; }
   .trim-summary { flex-wrap: wrap; }
+}
+/* Preserve a useful canvas on shorter phones; precise trim stays in its editor. */
+@media (max-width: 699px) and (max-height: 740px) {
+  .workspace[data-layout="compact"] .timeline-scale { display: none; }
+  .workspace[data-layout="compact"] .scrubber { height: 32px; }
+  .workspace[data-layout="compact"] .scrubber .filmstrip { height: 28px; }
+  .workspace[data-layout="compact"] .scrubber input.playhead { height: 32px; }
+  .workspace[data-layout="compact"] .scrubber .playhead::-webkit-slider-thumb { height: 28px; margin-top: -12px; }
+  .workspace[data-layout="compact"] .scrubber .playhead::-moz-range-thumb { height: 28px; }
 }
 @media (max-height: 600px) and (min-width: 600px) {
   .brand strong, .brand-studio, .document-meta { display: none; }
