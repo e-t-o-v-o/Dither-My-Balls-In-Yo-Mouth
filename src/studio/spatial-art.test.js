@@ -146,10 +146,10 @@ test.each([.52, .58, .64])("adaptive subdivision at detail %s uses solid, nonove
   r.tiles(out, () => [127, 127, 127, 255], () => c.fgColor, () => .5, c, size, size, 1, w, h, data);
   const xml = out.serialize();
   expect([...xml.matchAll(/opacity="([^"]+)"/g)].every(([, opacity]) => Number(opacity) === 1)).toBe(true);
-  // Each chamber has one full ink rectangle and one smaller corner square.
-  // Inspect the full rectangles to ensure a parent never overlaps its children.
+  // Each chamber has one full ink rectangle with a single notched cutout.
+  // Inspect those rectangles to ensure a parent never overlaps its children.
   const inks = [...xml.matchAll(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)" fill="#ff0000"/g)];
-  const leaves = inks.filter((_, i) => i % 2 === 0).map(m => m.slice(1).map(Number));
+  const leaves = inks.map(m => m.slice(1).map(Number));
   expect(leaves.reduce((area, [, , width, height]) => area + width * height, 0)).toBe(size * size);
   for (let i = 0; i < leaves.length; i++) for (let j = i + 1; j < leaves.length; j++) {
     const [x, y, width, height] = leaves[i], [xx, yy, ww, hh] = leaves[j];

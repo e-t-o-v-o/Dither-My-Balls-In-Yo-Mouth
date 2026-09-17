@@ -128,10 +128,16 @@ export class SpatialRenderer {
       ctx.fillStyle = c.bgColor;
       if (motif === 0) {
         const border = s * (.08 + t * .15), hole = s - border * 2;
-        ctx.fillRect(xx + border, yy + border, hole, hole);
-        ctx.fillStyle = ink;
         const a = s * (.22 + .18 * t), corner = (depth + Math.floor(seed * 4)) % 4;
-        ctx.fillRect(xx + (corner % 2 ? s - border - a : border), yy + (corner > 1 ? s - border - a : border), a, a);
+        // One notched cutout leaves the corner joined to its frame. Drawing a
+        // separate insert over an antialiased hole left a hairline at the join.
+        ctx.beginPath();
+        [[a, 0], [hole, 0], [hole, hole], [0, hole], [0, a], [a, a]].forEach(([u, v], i) => {
+          const px = xx + border + (corner % 2 ? hole - u : u);
+          const py = yy + border + (corner > 1 ? hole - v : v);
+          i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        });
+        ctx.closePath(); ctx.fill();
       } else if (motif === 1) {
         const bars = 3, band = s / (bars * 2 + 1), vertical = seed < .5;
         for (let i = 0; i < bars; i++) {
