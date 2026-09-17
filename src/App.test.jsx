@@ -102,8 +102,8 @@ test("Interlace controls and per-effect settings remain available across effect 
   expect(screen.getByLabelText("Structure")).toHaveValue("steps");
   expect(screen.getByRole("slider", { name: "Image detail", exact: true })).toHaveValue("42");
   fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
-  fireEvent.click(screen.getByRole("button", { name: "Loom primary", exact: true }));
-  expect(screen.getByLabelText("Palette")).toHaveValue("Loom primary");
+  fireEvent.click(screen.getByRole("radio", { name: "Loom primary", exact: true }));
+  expect(screen.getByRole("radio", { name: "Loom primary", exact: true })).toBeChecked();
 });
 test("preset save and restore work without blocking prompts", () => {
   render(<App />);
@@ -140,8 +140,8 @@ test("Artistic is a keyboard-accessible collection with focused previews, contro
   fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
   expect(screen.getByLabelText("Paper shapes")).toHaveValue("leaves");
   fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
-  fireEvent.click(screen.getByRole("button", { name: "Cathedral", exact: true }));
-  expect(screen.getByLabelText("Palette")).toHaveValue("Cathedral");
+  fireEvent.click(screen.getByRole("radio", { name: "Cathedral", exact: true }));
+  expect(screen.getByRole("radio", { name: "Cathedral", exact: true })).toBeChecked();
   fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
   expect(screen.getByLabelText("Technique")).toHaveValue("cut-paper");
   fireEvent.click(screen.getByRole("tab", { name: "Looks" }));
@@ -647,7 +647,7 @@ test("collage printing inks remain editable alongside its palette and optical st
   expect(screen.getByLabelText("Print treatment")).toHaveValue("type");
   expect(screen.queryByLabelText("Tile borders")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
-  expect(screen.getByLabelText("Palette")).toHaveValue("Spectral print");
+  expect(screen.getByRole("radio", { name: "Spectral print", exact: true })).toBeChecked();
   expect(screen.getByLabelText("Foreground color")).toHaveValue("#24192e");
   expect(screen.getByLabelText("Print paper")).toHaveValue("#fff1d2");
   fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
@@ -671,16 +671,37 @@ test("spatial looks expose their own scales, relevant controls, and inks", () =>
   fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
   expect(screen.getByLabelText("Relief shading")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
-  fireEvent.change(screen.getByLabelText("Technique"), { target: { value: "harmonics" } });
-  fireEvent.click(screen.getByRole("button", { name: /Coral syntax/ }));
-  expect(screen.getByLabelText("Pattern scale")).toHaveAttribute("min", "32");
-  expect(screen.queryByLabelText("Artistic color")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
-  expect(screen.getByLabelText("Accent ink")).toHaveValue("#aba5e2");
-  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  expect(screen.queryByRole("option", { name: "Harmonic field" })).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Technique"), { target: { value: "adaptive-tiles" } });
   fireEvent.click(screen.getByRole("button", { name: /Patchwork radio/ }));
   expect(screen.getByLabelText("Artistic color")).toHaveValue("source");
   fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
   expect(screen.queryByLabelText("Foreground color")).not.toBeInTheDocument();
+});
+
+test("the full palette browser updates the active effect and supports Undo", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("tab", { name: "Color", exact: true }));
+  fireEvent.change(screen.getByRole("searchbox", { name: "Search palettes" }), { target: { value: "Terracotta tide" } });
+  fireEvent.click(screen.getByRole("radio", { name: "Terracotta tide" }));
+  expect(screen.getByRole("radio", { name: "Terracotta tide" })).toBeChecked();
+  fireEvent.click(screen.getByRole("button", { name: "Clear", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Undo", exact: true }));
+  expect(screen.getByRole("radio", { name: "Paper", exact: true })).toBeChecked();
+  fireEvent.click(screen.getByRole("button", { name: "Redo", exact: true }));
+  expect(screen.getByRole("radio", { name: "Terracotta tide" })).toBeChecked();
+});
+
+test("retired Harmonic field stays editable in saved projects but is absent from new effect choices", () => {
+  localStorage.setItem("dither.config.v2", JSON.stringify({ effect: "harmonics", harmonicPhase: .4 }));
+  render(<App />);
+  expect(screen.getByRole("button", { name: "Change effect" })).toHaveTextContent("Harmonic field");
+  expect(screen.getByLabelText("Field phase")).toHaveValue("40");
+  fireEvent.click(screen.getByRole("button", { name: "Change effect" }));
+  expect(screen.queryByRole("button", { name: "Harmonic field", exact: true })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  fireEvent.click(screen.getByRole("button", { name: "Manage effect layers" }));
+  expect(within(screen.getByLabelText("Add effect")).queryByRole("option", { name: "Harmonic field" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "Artistic" }));
+  expect(screen.queryByRole("button", { name: /Coral syntax|Plasma garden|Resonant silk/ })).not.toBeInTheDocument();
 });

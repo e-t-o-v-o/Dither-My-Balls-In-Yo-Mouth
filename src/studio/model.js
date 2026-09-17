@@ -1,35 +1,9 @@
 import { effectScale } from "./effect-scale";
 import { sanitizeMotion } from "./motion";
-import { charPalettes, paletteSets, asciiVariants, fonts } from "../constants";
+import { asciiVariants, fonts } from "../constants";
+import { palettes, resolvePaletteName } from "./palettes";
+export { palettes } from "./palettes";
 export { asciiVariants, fonts };
-export const palettes = {
-  "Spectral print": ["#2324d9", "#ee4c92", "#f47d22", "#ffe55c", "#54c6d4", "#439357", "#f4ecdd"],
-  "Toner red": ["#171616", "#f0321a", "#f4e7c9"],
-  "Mineral": ["#162f3a", "#27656d", "#559c91", "#b6c8a0", "#d79d62", "#b95c43", "#eee2c5"],
-  "Silk": ["#192441", "#39599a", "#528d9b", "#b36783", "#dc927c", "#e9bf77", "#f3e7cd"],
-  "Gouache": ["#152b69", "#2257b8", "#25896b", "#d94d35", "#ee9689", "#efb63d", "#f4e6cb"],
-  "Cathedral": ["#162335", "#4c345d", "#146974", "#3e8a9c", "#ba5846", "#d5a353", "#d2ddd0"],
-  "Candy lacquer": ["#35234d", "#7550a6", "#e45b84", "#f2935c", "#6bbcae", "#f3ce61", "#f6ead7"],
-  "Loom primary": ["#191919", "#0070f6", "#ff0000", "#00af57", "#ff69a2", "#fbbb00"],
-  "Loom textile": ["#2d2d2d", "#99270d", "#2677d9", "#1ea963", "#e83014", "#ff6e26", "#aecce5", "#cecece", "#ffcf43", "#efe3da"],
-  "Loom nocturne": ["#060606", "#8c301b", "#d53d25", "#498e75", "#3175d5", "#e979ab", "#cececc"],
-  Paper: ["#101215", "#f1f2e9"],
-  Phosphor: ["#071912", "#315c36", "#8ca942", "#dbf69b"],
-  Amber: ["#181108", "#744c1b", "#cd933e", "#ffe0a0"],
-  Electric: ["#11101a", "#523cff", "#eaa3ff", "#f6f1ff"],
-  "Signal pop": [
-    "#152939",
-    "#155fd5",
-    "#f34980",
-    "#fe893b",
-    "#d8e940",
-    "#fff4d5",
-  ],
-  "Cobalt vermilion": ["#103eac", "#60b5de", "#f44913", "#f7f6ed"],
-  "Acid ink": ["#20251b", "#5f704a", "#a4b76e", "#f4ff64"],
-  ...charPalettes,
-  ...paletteSets,
-};
 export const spatialArtEffects = ["relief", "harmonics", "adaptive-tiles"];
 export const mappedArtEffects = ["relief", "adaptive-tiles", "print-collage", "marbling", "topography", "threadwork", "guilloche", "cut-paper", "glass", "arc-tiles"];
 export const materialArtEffects = ["marbling", "topography", "threadwork"];
@@ -134,6 +108,8 @@ export const effects = [
     "Source-color mosaic, also useful for chroma keying.",
   ],
 ];
+// Retired renderers remain valid for saved projects but are not offered for new work.
+export const availableEffects = effects.filter(([id]) => !["dither-ascii", "harmonics"].includes(id));
 export const methods = [
   ["ordered", "Bayer ordered"],
   ["floyd", "Floyd–Steinberg"],
@@ -425,6 +401,8 @@ export function sanitizeConfig(input = {}) {
   if (Object.hasOwn(legacy, c.effect)) Object.assign(c, legacy[c.effect]);
   if (!effects.some(([id]) => id === c.effect)) c.effect = defaults.effect;
   if (!methods.some(([id]) => id === c.method)) c.method = defaults.method;
+  c.palette = resolvePaletteName(c.palette);
+  c.echoPalette = resolvePaletteName(c.echoPalette);
   if (!Object.hasOwn(palettes, c.palette)) c.palette = defaults.palette;
   for (const k of [
     "fgColor",
@@ -549,12 +527,6 @@ export const looks = [
     config: { ...defaults, effect: "relief", cellSize: 36, artColorMode: "source", fgColor: "#eeae87", bgColor: "#152133", reliefDepth: 3.6, reliefSlant: -.4, reliefShade: .35 } },
   { name: "Afterimage terrain", note: "Paper relief / fine luminous wire ridges",
     config: { ...defaults, effect: "relief", cellSize: 18, artColorMode: "ink", fgColor: "#f3dfae", bgColor: "#19171c", reliefStyle: "wire", reliefDepth: 3.4, reliefSlant: 0 } },
-  { name: "Coral syntax", note: "Harmonic field / vermilion & lilac membranes",
-    config: { ...defaults, effect: "harmonics", cellSize: 60, fgColor: "#ef4b2c", accentColor: "#aba5e2", bgColor: "#f3eddb", harmonicWarp: .85, harmonicAccent: .7, harmonicWeight: 1.05 } },
-  { name: "Plasma garden", note: "Harmonic field / luminous organic channels",
-    config: { ...defaults, effect: "harmonics", cellSize: 44, fgColor: "#d2f586", accentColor: "#349b95", bgColor: "#152934", harmonicWarp: 1, harmonicAccent: .85, harmonicWeight: 1.1, artSeed: 41 } },
-  { name: "Resonant silk", note: "Harmonic field / intersecting violet lattices",
-    config: { ...defaults, effect: "harmonics", cellSize: 56, fgColor: "#5041aa", accentColor: "#ed9c7f", bgColor: "#f5e3d1", harmonicStructure: "lattice", harmonicWarp: .55, harmonicAccent: .75 } },
   { name: "City inlay", note: "Adaptive tiles / chambers within chambers",
     config: { ...defaults, effect: "adaptive-tiles", cellSize: 64, artColorMode: "tone", palette: "Gouache", bgColor: "#f4e6cb", tileDetail: .58, tileMotif: "chambers", tileGap: .08 } },
   { name: "Patchwork radio", note: "Adaptive tiles / multiscale patterned inlays",

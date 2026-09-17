@@ -150,7 +150,6 @@ try {
     ["webm", "Chromatic type"], ["mp4", "Toner rouge"], ["mp4", "Opal interference"],
     ["webm", "Solar impression"], ["mp4", "Chromatic orbits"],
     ["mp4", "Chromatic escarpment"], ["webm", "Afterimage terrain"],
-    ["mp4", "Coral syntax"], ["webm", "Resonant silk"],
     ["mp4", "City inlay"], ["webm", "Patchwork radio"]);
   if (process.argv.includes("--all-effects")) {
     const covered = new Set(cases.map(([, name]) => looks.find(look => look.name === name).config.effect));

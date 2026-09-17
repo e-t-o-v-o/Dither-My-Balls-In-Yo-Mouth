@@ -14,7 +14,7 @@ export function useAppearance() {
         : appearance;
       document.documentElement.dataset.theme = theme;
       document.querySelector('meta[name="theme-color"]')?.setAttribute(
-        "content", theme === "dark" ? "#1d2026" : "#ffffff",
+        "content", theme === "dark" ? "#000000" : "#ffffff",
       );
     };
     apply();

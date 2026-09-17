@@ -6,6 +6,7 @@ import { configAtTime, availableMotionControls } from "./motion";
 import { effectScale } from "./effect-scale";
 import { ContourPlate } from "./contour-plate";
 import { contourPaths } from "./graphics";
+import { SpatialRenderer } from "./spatial-art";
 
 beforeAll(() => {
   global.document = { createElement: () => createCanvas(1, 1) };
@@ -22,7 +23,16 @@ function source(alpha = 1, portrait = false) {
   ctx.fillStyle = "#182937"; ctx.beginPath(); ctx.arc(c.width * .6, c.height * .45, c.width * .13, 0, Math.PI * 2); ctx.fill();
   return c;
 }
-const newLooks = looks.filter(look => spatialArtEffects.includes(look.config.effect));
+// Keep coverage for retired effects so saved projects still render correctly.
+const compatibilityLooks = [
+  { name: "Coral syntax", note: "Harmonic field / vermilion & lilac membranes",
+    config: { ...defaults, effect: "harmonics", cellSize: 60, fgColor: "#ef4b2c", accentColor: "#aba5e2", bgColor: "#f3eddb", harmonicWarp: .85, harmonicAccent: .7, harmonicWeight: 1.05 } },
+  { name: "Plasma garden", note: "Harmonic field / luminous organic channels",
+    config: { ...defaults, effect: "harmonics", cellSize: 44, fgColor: "#d2f586", accentColor: "#349b95", bgColor: "#152934", harmonicWarp: 1, harmonicAccent: .85, harmonicWeight: 1.1, artSeed: 41 } },
+  { name: "Resonant silk", note: "Harmonic field / intersecting violet lattices",
+    config: { ...defaults, effect: "harmonics", cellSize: 56, fgColor: "#5041aa", accentColor: "#ed9c7f", bgColor: "#f5e3d1", harmonicStructure: "lattice", harmonicWarp: .55, harmonicAccent: .75 } },
+];
+const newLooks = [...looks.filter(look => spatialArtEffects.includes(look.config.effect)), ...compatibilityLooks];
 const families = spatialArtEffects.map(effect => newLooks.find(look => look.config.effect === effect));
 test.each(newLooks)("$name keeps SVG geometry and raster output aligned", async ({ config }) => {
   const input = source(), out = createCanvas(400, 240), vector = new SVGContext(400, 240);
@@ -120,5 +130,29 @@ test("integer contour tracing retains saddle decisions, holes, and closed edge c
     let error = 0; const aa = bytes(fast), bb = bytes(reference);
     for (let i = 3; i < aa.length; i += 4) error += Math.abs(aa[i] - bb[i]);
     expect(error / (w * h * 400)).toBeLessThan(.05);
+  }
+});
+
+test.each([.52, .58, .64])("adaptive subdivision at detail %s uses solid, nonoverlapping leaf tiles", detail => {
+  // Alternating midtones put several subdivision levels inside the old
+  // crossfade band. Every printed shape must still use full ink opacity.
+  const w = 32, h = 32, size = 256, data = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const value = (i + Math.floor(i / w)) % 2 ? 150 : 104;
+    data.set([value, value, value, 255], i * 4);
+  }
+  const c = { ...defaults, effect: "adaptive-tiles", cellSize: 64, tileGap: 0, tileDetail: detail, tileMotif: "chambers", fgColor: "#ff0000", bgColor: "#ffffff" };
+  const out = new SVGContext(size, size), r = new SpatialRenderer();
+  r.tiles(out, () => [127, 127, 127, 255], () => c.fgColor, () => .5, c, size, size, 1, w, h, data);
+  const xml = out.serialize();
+  expect([...xml.matchAll(/opacity="([^"]+)"/g)].every(([, opacity]) => Number(opacity) === 1)).toBe(true);
+  // Each chamber has one full ink rectangle and one smaller corner square.
+  // Inspect the full rectangles to ensure a parent never overlaps its children.
+  const inks = [...xml.matchAll(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)" fill="#ff0000"/g)];
+  const leaves = inks.filter((_, i) => i % 2 === 0).map(m => m.slice(1).map(Number));
+  expect(leaves.reduce((area, [, , width, height]) => area + width * height, 0)).toBe(size * size);
+  for (let i = 0; i < leaves.length; i++) for (let j = i + 1; j < leaves.length; j++) {
+    const [x, y, width, height] = leaves[i], [xx, yy, ww, hh] = leaves[j];
+    expect(x + width <= xx || xx + ww <= x || y + height <= yy || yy + hh <= y).toBe(true);
   }
 });
