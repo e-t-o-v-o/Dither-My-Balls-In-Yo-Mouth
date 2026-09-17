@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Temporary responsive design review</title>
+<style>
+  body { margin: 0; background: #dedede; font: 14px system-ui; color: #111; }
+  nav { display: flex; gap: 8px; padding: 12px; position: sticky; top: 0; background: #fff; z-index: 2; }
+  button { font: inherit; padding: 10px; cursor: pointer; }
+  iframe { display: block; border: 0; margin: 16px auto; background: #fff; }
+</style>
+<nav aria-label="Review viewport">
+  <button data-size="390,844">Phone 390 × 844</button>
+  <button data-size="375,667">Small phone 375 × 667</button>
+  <button data-size="820,1180">Tablet portrait 820 × 1180</button>
+  <button data-size="1180,820">Tablet landscape 1180 × 820</button>
+  <button data-size="844,390">Phone landscape 844 × 390</button>
+</nav>
+<iframe id="workspace-review" title="Studio at review size" src="/" width="390" height="844"></iframe>
+<script>
+  document.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
+    const [width, height] = button.dataset.size.split(',');
+    const frame = document.querySelector('iframe'); frame.width = width; frame.height = height;
+  }));
+</script>
+</html>
