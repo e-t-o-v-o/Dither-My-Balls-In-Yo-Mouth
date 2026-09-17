@@ -1,18 +1,17 @@
 # Spatial studies
 
-Three new artistic techniques add eight starters. Each transforms the current image or video frame and supports selections, effect layers, PNG/SVG, GIF, and MP4/WebM through the shared rendering pipeline.
+Paper relief and Adaptive tiles provide five starters. Each transforms the current image or video frame and supports selections, effect layers, PNG/SVG, GIF, and MP4/WebM through the shared rendering pipeline.
 
 | Technique | Starters | Controls |
 | --- | --- | --- |
 | Paper relief | Porcelain ridges, Chromatic escarpment, Afterimage terrain | Ridge spacing, height, slant, ridges/wire, shading, source/palette/tonal/single ink |
-| Harmonic field | Coral syntax, Plasma garden, Resonant silk | Pattern scale, organic flow/lattice, flow, weight, phase, membrane edge, seed, two inks |
 | Adaptive tiles | City inlay, Patchwork radio | Tile size, image detail, spacing, mixed/chambers/stripes, seed, source/palette/tonal/single ink |
 
 Paper relief lifts source tones into overlapping ridges. Rows are painted from back to front, producing real occlusion. Wire retains fine edges while filled ridges retain the colored faces. Source colors are sampled once per ridge-sized cell; the ridge geometry is sampled more finely. Background brightness determines which source tones rise. Shading is hidden in wire mode, including its motion track; returning to ridges restores the saved setting.
 
-Harmonic field combines periodic waves with a source-responsive threshold. It creates organic membranes or lattices; phase and flow can animate through Motion. A cached scalar field and integer contour connectivity keep its geometry bounded. Contours use the same saddle decisions, holes, and boundary closure in Canvas and SVG.
+Harmonic field is retired from the Artistic collection, effect picker, and Add effect menu. Its renderer and editable settings remain available to open existing projects without losing their output.
 
-Adaptive tiles subdivide around brightness variation, measured using alpha-weighted summed-area moments. This includes details between the center and corners of a tile. Subdivision has three levels and transitions gradually near each threshold. The layout depends on the current frame, never on frame history. Flat-color boundaries without a brightness change do not trigger subdivision. Small details below the sampled grid remain bounded by the chosen tile size.
+Adaptive tiles subdivide around brightness variation, measured using alpha-weighted summed-area moments. This includes details between the center and corners of a tile. Subdivision has three levels. Each region draws either one solid tile or its children, never overlapping transparent versions of both. Crossing a detail threshold changes the subdivision directly; this intentionally replaces the old opacity crossfade. The layout depends on the current frame, never on frame history. Flat-color boundaries without a brightness change do not trigger subdivision. Small details below the sampled grid remain bounded by the chosen tile size.
 
 The layout seeds stay fixed during video. Motion exposes continuous controls only. Overlapping artwork receives source alpha once; repeated ink and paper do not turn a soft selection opaque. Transparent PNG/SVG retain the source selection. Video and GIF flatten onto the selected background. SVG retains editable paths and shapes for these effects; existing stack and finishing rasterization rules still apply.
 
@@ -26,7 +25,7 @@ The layout seeds stay fixed during video. Motion exposes continuous controls onl
 
 ## Verification
 
-Regression coverage includes all eight starters, raster/SVG parity, soft alpha in portrait and landscape, transparent-frame clearing, opaque export flattening, source response, seeking, resize/cache changes, motion, imported settings, contour topology, control visibility, Undo, and stale-preview cancellation. The full existing suite and production build are also run.
+Regression coverage includes the five current starters and three retired Harmonic field fixtures, solid nonoverlapping adaptive leaves near subdivision thresholds, raster/SVG parity, soft alpha in portrait and landscape, transparent-frame clearing, opaque export flattening, source response, seeking, resize/cache changes, motion, imported settings, contour topology, control visibility, Undo, and stale-preview cancellation. The full existing suite and production build are also run.
 
 The actual codec matrix includes the new families and distinct modes in H.264/AAC MP4 and VP8/Opus WebM. It decodes output to check motion, frame counts, dimensions, trim, audio timing, and cancellation recovery. Native rendering measurements are not browser or physical-device FPS guarantees. Physical iPad/iPhone and Safari testing remain outside this environment.
 

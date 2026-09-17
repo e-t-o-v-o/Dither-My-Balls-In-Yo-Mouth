@@ -16,7 +16,7 @@
         const dark = preference === "dark" ||
           (preference !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.dataset.theme = dark ? "dark" : "light";
-        document.querySelector('meta[name="theme-color"]').content = dark ? "#1d2026" : "#ffffff";
+        document.querySelector('meta[name="theme-color"]').content = dark ? "#000000" : "#ffffff";
       })();
     </script>
     <meta

@@ -1,7 +1,7 @@
 import React from "react";
 import { EffectControls, ColorControls, Range, Select, Icon } from "./Controls";
 import { MotionControls } from "./MotionControls";
-import { defaults, effects, sanitizeConfig } from "./model";
+import { defaults, effects, availableEffects, sanitizeConfig } from "./model";
 import { effectDefaults, effectSnapshot } from "./effect-registry";
 import { stackEntries, layerConfig, moveLayer } from "./stack";
 
@@ -50,7 +50,7 @@ export function EffectStack({ config, set, source, trim, time, seekTo, customFon
           <button className="icon-button" aria-label={`Move layer ${index + 1} down`} disabled={index === layers.length - 1} onClick={() => save(moveLayer(layers, selected.id, 1))}><Icon name="chevron" /></button>
           {!main && <button className="icon-button" aria-label={`Remove ${name(selected)} layer ${index + 1}`} onClick={() => { save(layers.filter(layer => layer.id !== selected.id)); updateView({ editing: "main" }); }}><Icon name="trash" /></button>}
         </div>}
-        {layers.length < 3 && <Select label="Add effect" value="" onChange={add}><option value="">Choose another treatment…</option>{effects.filter(([id]) => id !== "dither-ascii").map(([id, label]) => <option key={id} value={id}>{label}</option>)}</Select>}
+        {layers.length < 3 && <Select label="Add effect" value="" onChange={add}><option value="">Choose another treatment…</option>{availableEffects.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</Select>}
         {config.stack.length > 0 && <Range label={`${name(selected)} layer blend`} value={selected.mix * 100} min={0} max={100} unit="%" onChange={value => patch(selected.id, { mix: value / 100 })} />}
         <p className="hint layer-order-note">Effects run from top to bottom.</p>
       </div>}

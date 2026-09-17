@@ -128,10 +128,16 @@ export class SpatialRenderer {
       ctx.fillStyle = c.bgColor;
       if (motif === 0) {
         const border = s * (.08 + t * .15), hole = s - border * 2;
-        ctx.fillRect(xx + border, yy + border, hole, hole);
-        ctx.fillStyle = ink;
         const a = s * (.22 + .18 * t), corner = (depth + Math.floor(seed * 4)) % 4;
-        ctx.fillRect(xx + (corner % 2 ? s - border - a : border), yy + (corner > 1 ? s - border - a : border), a, a);
+        // One notched cutout leaves the corner joined to its frame. Drawing a
+        // separate insert over an antialiased hole left a hairline at the join.
+        ctx.beginPath();
+        [[a, 0], [hole, 0], [hole, hole], [0, hole], [0, a], [a, a]].forEach(([u, v], i) => {
+          const px = xx + border + (corner % 2 ? hole - u : u);
+          const py = yy + border + (corner > 1 ? hole - v : v);
+          i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        });
+        ctx.closePath(); ctx.fill();
       } else if (motif === 1) {
         const bars = 3, band = s / (bars * 2 + 1), vertical = seed < .5;
         for (let i = 0; i < bars; i++) {
@@ -143,22 +149,17 @@ export class SpatialRenderer {
         ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(xx + s / 2, yy + s / 2, s * (.1 + t * .18), 0, TAU); ctx.fill();
       }
     };
-    const visit = (x, y, side, depth, opacity = 1) => {
+    const visit = (x, y, side, depth) => {
       if (x >= width || y >= height) return;
-      const p = sample(x + side / 2, y + side / 2);
       const variation = detail(x, y, side);
       const threshold = .46 - c.tileDetail * .42;
-      let split = depth < 3 ? clamp((variation - threshold + .035) / .07) : 0;
-      split = split * split * (3 - 2 * split);
-      ctx.globalAlpha = opacity;
-      // Children crossfade over an opaque parent inside the printed plate.
-      // The transition reduces abrupt tree changes in moving footage.
-      if (split < 1) stamp(x, y, side, p, depth);
-      if (split > 0) {
-        ctx.fillStyle = c.bgColor; ctx.globalAlpha = opacity * split;
-        ctx.fillRect(x, y, side, side);
-        for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) visit(x + dx * side / 2, y + dy * side / 2, side / 2, depth + 1, opacity * split);
-      }
+      // A region contains either its parent tile or four children, never both.
+      // Decide from the current frame only, so seeks and exports match preview.
+      if (depth < 3 && variation > threshold) {
+        const half = side / 2;
+        visit(x, y, half, depth + 1); visit(x + half, y, half, depth + 1);
+        visit(x, y + half, half, depth + 1); visit(x + half, y + half, half, depth + 1);
+      } else stamp(x, y, side, sample(x + side / 2, y + side / 2), depth);
     };
     for (let y = 0; y < height; y += size) for (let x = 0; x < width; x += size) visit(x, y, size, 0);
     ctx.globalAlpha = 1;

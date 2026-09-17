@@ -2,17 +2,17 @@ import React, { createContext, useContext, useId, useRef, useState, useEffect } 
 import { effectFamily, effectDefaults, effectSnapshot } from "./effect-registry";
 import { effectScale } from "./effect-scale";
 import { Dialog } from "./Dialog";
+import { PaletteBrowser } from "./PaletteBrowser";
 import {
   effects,
+  availableEffects,
   defaults,
   looks,
   methods,
-  palettes,
   fonts,
   asciiVariants,
   usesPalette,
   mappedArtEffects,
-  materialArtEffects,
   editorialArtEffects,
 } from "./model";
 export const AdjustmentContext = createContext({ begin() {}, end() {} });
@@ -412,7 +412,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
             {["Artistic", "Graphic", "Digital", "Utilities"].map(name => <button key={name} aria-pressed={activeFamily === name} onClick={() => setFamily(name)}>{name}</button>)}
           </div>
           <div className="effect-grid">
-            {effects.filter(([id]) => id !== "dither-ascii" && effectFamily(id) === activeFamily).map(([id, name, n, description]) => {
+            {availableEffects.filter(([id]) => effectFamily(id) === activeFamily).map(([id, name, n, description]) => {
               const look = looks.find(look => look.config.effect === id);
               const active = c.effect === id || (id === "ascii" && c.effect === "dither-ascii");
               return <button key={id} aria-label={name} title={description} className="effect" aria-pressed={active} onClick={() => { set("effect", id); setChoosing(false); }}>
@@ -455,7 +455,7 @@ export function EffectControls({ config: c, set, customFonts, onFontUpload }) {
           <Select label="Tile motifs" value={c.tileMotif} onChange={v => set("tileMotif", v)}><option value="mixed">Mixed · chambers, stripes & discs</option><option value="chambers">Chambers · nested inlays</option><option value="stripes">Stripes · woven screens</option></Select>
           <Range label="Follow image detail" value={c.tileDetail * 100} min={0} max={100} unit="%" onChange={v => set("tileDetail", v / 100)} />
           <Range label="Tile spacing" value={c.tileGap * 100} min={0} max={30} unit="%" onChange={v => set("tileGap", v / 100)} />
-          <p className="hint">Large tiles divide where the image changes most. Transitions soften subdivision changes during video.</p>
+          <p className="hint">Large tiles divide where the image changes most. Each region uses one solid tile pattern.</p>
         </>}
         {c.effect === "harmonics" && <>
           <Range label="Pattern seed" value={c.artSeed} min={0} max={99} onChange={v => set("artSeed", v)} />
@@ -991,54 +991,8 @@ export function ColorControls({
     <>
       {usesPalette(c) && (
         <section className="inspector-section">
-          <div className="section-heading">
-            <h2>Color palette</h2>
-            <span>{palettes[c.palette].length} colors</span>
-          </div>
-          <div className="large-swatches">
-            {palettes[c.palette].map((col, i) => (
-              <span
-                key={`${col}-${i}`}
-                style={{ background: col }}
-                title={col}
-              />
-            ))}
-          </div>
-          <Select
-            label="Palette"
-            value={c.palette}
-            onChange={(v) => set("palette", v)}
-          >
-            {Object.keys(palettes).map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </Select>
-          <div className="palette-grid">
-            {(c.effect === "print-collage" || (c.effect === "mosaic" && c.mosaicLayout === "targets") ? ["Spectral print", "Toner red", "Gouache", "Signal pop", "Electric", "Paper"] : c.effect === "interlace" ? ["Loom primary", "Loom textile", "Loom nocturne", "Paper", "Signal pop", "Electric"] : materialArtEffects.includes(c.effect) ? ["Mineral", "Silk", "Gouache", "Cathedral", "Candy lacquer", "Paper"] : mappedArtEffects.includes(c.effect) ? ["Gouache", "Cathedral", "Candy lacquer", "Paper", "Signal pop", "Electric"] : [
-              "Paper",
-              "Phosphor",
-              "Amber",
-              "Electric",
-              "Vaporwave Aurora",
-              "Brutalist Neon Clash",
-            ]).map((p) => (
-              <button
-                key={p}
-                className={
-                  c.palette === p ? "palette-option selected" : "palette-option"
-                }
-                onClick={() => set("palette", p)}
-                aria-pressed={c.palette === p}
-              >
-                <span className="swatches">
-                  {palettes[p].map((col, i) => (
-                    <i key={i} style={{ background: col }} />
-                  ))}
-                </span>
-                <span>{p}</span>
-              </button>
-            ))}
-          </div>
+          <h2>Color palette</h2>
+          <PaletteBrowser value={c.palette} onChange={v => set("palette", v)} />
         </section>
       )}
       <section className="inspector-section">
@@ -1179,15 +1133,8 @@ export function ColorControls({
                 max={255}
                 onChange={(v) => set("echoThreshold", v)}
               />
-              <Select
-                label="Echo palette"
-                value={c.echoPalette}
-                onChange={(v) => set("echoPalette", v)}
-              >
-                {Object.keys(palettes).map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </Select>
+              <h3 className="palette-title">Echo palette</h3>
+              <PaletteBrowser label="Echo palette" value={c.echoPalette} onChange={v => set("echoPalette", v)} />
               <p className="hint">
                 Echoes follow the selection. Without a mask, they follow dark
                 shapes.
