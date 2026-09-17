@@ -9,10 +9,14 @@ body {
   margin: 0;
   font-family:
     -apple-system,
+    system-ui,
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  letter-spacing: -.01em;
 }
 button,
 input,
@@ -67,7 +71,7 @@ p {
   margin-top: 0;
 }
 button {
-  font-weight: 550;
+  font-weight: 500;
 }
 fieldset {
   min-width: 0;

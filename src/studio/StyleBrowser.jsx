@@ -7,6 +7,7 @@ import { applyStyle } from "./workflow";
 import { frameDimensions } from "./framing";
 import { Dialog } from "./Dialog";
 import { Icon } from "./Controls";
+import { SearchField } from "./SearchField";
 const thumbnail = (look) =>
   `${import.meta.env.BASE_URL}styles/${look.name.toLowerCase().replace(/\s+/g, "-")}.png`;
 export function StyleBrowser({
@@ -137,10 +138,9 @@ export function StyleBrowser({
       </div>
       <div className="gallery-filters">
       <div className="control style-search"><label className="sr-only" htmlFor={searchId}>Find a look</label>
-        <span className="style-search-field">
-          <input id={searchId} type="search" value={query} placeholder={artistic ? "Try marbling, silk, contours…" : "Search studio looks…"} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === "Escape") { setQuery(""); e.stopPropagation(); } }} disabled={busy} />
-          {query && <button type="button" className="style-search-clear" aria-label="Clear look search" onClick={() => setQuery("")} disabled={busy}>×</button>}
-        </span>
+        <SearchField id={searchId} value={query} onChange={setQuery}
+          placeholder={artistic ? "Try marbling, silk, contours…" : "Search studio looks…"}
+          clearLabel="Clear look search" disabled={busy} />
       </div>
       {artistic && <label className="control technique-filter"><span className="sr-only">Technique</span>
         <select value={technique} onChange={e => onTechniqueChange(e.target.value)} disabled={busy}>
@@ -151,7 +151,7 @@ export function StyleBrowser({
       </div>
       {config.maskMode !== "none" && <label className="check style-options"><input type="checkbox" checked={keepMask} onChange={e => setKeepMask(e.target.checked)} disabled={busy} /><span>Keep selection when changing looks</span></label>}
       {config.stack.length > 1 && <p className="hint gallery-scope">Replaces the main effect · Keeps your added layers</p>}
-      <div className="gallery-toolbar"><span>{visibleLooks.length} styles</span><button className="small style-preview-button" aria-label={rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview looks on this frame"} onClick={rendering ? close : preview} disabled={busy || !visibleLooks.length}>
+      <div className="gallery-toolbar"><span>{visibleLooks.length} {visibleLooks.length === 1 ? "style" : "styles"}</span><button className="small style-preview-button" aria-label={rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview looks on this frame"} onClick={rendering ? close : preview} disabled={busy || !visibleLooks.length}>
         {rendering ? `Stop previews · ${Object.keys(previews).length} / ${visibleLooks.length}` : "Preview your frame"}
       </button></div>
       {error && <p className="inline-error">{error}</p>}

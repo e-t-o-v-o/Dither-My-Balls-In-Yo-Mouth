@@ -1,5 +1,6 @@
 import React, { useId, useState } from "react";
 import { paletteCatalog, paletteGroups, palettes } from "./palettes";
+import { SearchField } from "./SearchField";
 
 export function PaletteBrowser({ value, onChange, label = "Palette" }) {
   const id = useId(), [query, setQuery] = useState("");
@@ -16,8 +17,7 @@ export function PaletteBrowser({ value, onChange, label = "Palette" }) {
     </div>
     <div className="palette-search">
       <label htmlFor={`${id}-search`} className="sr-only">Search {label.toLowerCase()}s</label>
-      <input id={`${id}-search`} type="search" value={query} placeholder="Find colors or a palette…" onChange={event => setQuery(event.target.value)} />
-      {query && <button type="button" className="small" onClick={() => setQuery("")}>Clear</button>}
+      <SearchField id={`${id}-search`} value={query} onChange={setQuery} placeholder="Find colors or a palette…" clearLabel="Clear" />
     </div>
     <div className="palette-count" role="status">{matches.length} {matches.length === 1 ? "palette" : "palettes"}{query && ` matching “${query}”`}</div>
     <fieldset className="palette-collection" aria-label={label}>
