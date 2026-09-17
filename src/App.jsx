@@ -1064,12 +1064,14 @@ function App() {
         <a href="#workspace" className="brand" aria-label="Dither workspace">
           <svg className="brand-mark" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             {[0, 1, 2].flatMap(y => [0, 1, 2].map(x => <circle key={`${x}-${y}`} cx={5 + x * 7} cy={5 + y * 7} r={2.5 - (x + y) * .42} />))}
-          </svg><strong>Dither</strong>
+          </svg><strong>Dither</strong><span className="brand-studio">Studio</span>
         </a>
         <button className="document-button" aria-label="Project" title={source.name}
           disabled={busy || loading} onClick={() => setDialog("project")}>
-          <span className="document-title">{source.name}</span>
-          <span className="document-meta">{source.kind === "demo" ? "Sample" : source.kind === "camera" ? "Live camera" : `${source.width} × ${source.height}`}</span>
+          <span className="document-copy">
+            <span className="document-title">{source.name}</span>
+            <span className="document-meta">{source.kind === "demo" ? "Sample" : source.kind === "camera" ? "Live camera" : `${source.width} × ${source.height}`}</span>
+          </span>
           <Icon name="chevron" />
         </button>
         <div className="top-actions">
@@ -1496,8 +1498,8 @@ function App() {
             )}
             <p className="hint">{autosaveStatus}</p>
             <h3>Appearance</h3>
-            <div className="segmented" role="group" aria-label="Appearance">
-              {["system", "light", "dark"].map(value => <button key={value} aria-pressed={theme === value} onClick={() => setTheme(value)}>{value[0].toUpperCase() + value.slice(1)}</button>)}
+            <div className="segmented appearance-control" role="group" aria-label="Appearance">
+              {["system", "light", "dark"].map(value => <button key={value} aria-pressed={theme === value} onClick={() => setTheme(value)}><Icon name={value === "light" ? "sun" : value === "dark" ? "moon" : "system"} />{value[0].toUpperCase() + value.slice(1)}</button>)}
             </div>
             <button className="quiet full" onClick={() => setDialog("preview")}>Preview quality & source size</button>
             <button className="quiet full" onClick={() => setDialog("help")}><Icon name="help" />Help & shortcuts</button>
